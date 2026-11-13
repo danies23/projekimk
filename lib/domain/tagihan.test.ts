@@ -206,3 +206,35 @@ describe("rincian tagihan setelah checkout", () => {
     expect(sesudah.status).toBe("lunas");
   });
 });
+
+describe("biaya kamar saat pindah bed dini hari", () => {
+  it("memakai tanggal lokal, bukan potongan UTC, untuk batas segmen", () => {
+    // 22:30 UTC tanggal 2 Maret = 05:30 WIB tanggal 3 Maret. Memotong string
+    // UTC akan menagih malam ke-3 dengan tarif kamar baru.
+    const deps = depsUji({
+      hariIni: () => "2026-03-04",
+      sekarang: () => "2026-03-02T22:30:00.000Z",
+    });
+    const store = storeUji(deps, stateDasar());
+    const pasien = store.dispatch({ type: "pasien/dibuat", olehId: PENGGUNA_UJI.pendaftaran, input: IDENTITAS_PASIEN });
+    if (!pasien.ok) throw new Error(pasien.alasan);
+    const admisi = store.dispatch({
+      type: "admisi/dibuat",
+      olehId: PENGGUNA_UJI.pendaftaran,
+      pasienId: pasien.id,
+      dokterId: PENGGUNA_UJI.dokter,
+      bedId: "bed-1",
+      tanggalMasuk: "2026-03-01",
+      diagnosaAwal: "Observasi",
+    });
+    if (!admisi.ok) throw new Error(admisi.alasan);
+    store.dispatch({ type: "admisi/pindah-bed", olehId: PENGGUNA_UJI.perawat, admisiId: admisi.id, bedId: "bed-2" });
+
+    const rincian = rincianTagihan(store.getState(), store.getState().tagihan[0]!.id, "2026-03-04")!;
+
+    // Masuk 1 Maret, pindah 3 Maret: segmen pertama 1–2 (2 hari), kedua 3–4 (2 hari).
+    expect(rincian.lamaInap).toBe(4);
+    expect(rincian.kamar.map((b) => b.lamaHari)).toEqual([2, 2]);
+    expect(rincian.kamar.reduce((n, b) => n + b.lamaHari, 0)).toBe(rincian.lamaInap);
+  });
+});

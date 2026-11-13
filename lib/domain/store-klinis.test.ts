@@ -140,3 +140,50 @@ describe("dispatch: rekam medis", () => {
     expect(aksi).toContain("rekam_medis.dikoreksi");
   });
 });
+
+describe("admisi selesai tidak menerima biaya baru", () => {
+  /** Admisi aktif, dibayar lunas, lalu di-checkout — tagihannya terkunci. */
+  function admisiSelesai() {
+    const { store, admisiId } = stateDenganAdmisi();
+    const tagihanId = store.getState().tagihan[0]!.id;
+    store.dispatch({
+      type: "pembayaran/dicatat",
+      olehId: PENGGUNA_UJI.kasir,
+      tagihanId,
+      jumlah: 1_500_000,
+      metode: "tunai",
+    });
+    const keluar = store.dispatch({ type: "checkout", olehId: PENGGUNA_UJI.kasir, admisiId, override: null });
+    if (!keluar.ok) throw new Error(keluar.alasan);
+    return { store, admisiId };
+  }
+
+  it("menolak tindakan baru dan tidak mengubah tagihan", () => {
+    const { store, admisiId } = admisiSelesai();
+    const sebelum = structuredClone(store.getState().tindakanAdmisi);
+
+    const hasil = store.dispatch({
+      type: "tindakan/ditambahkan",
+      olehId: PENGGUNA_UJI.dokter,
+      admisiId,
+      tindakanId: "tindakan-1",
+    });
+
+    expect(hasil).toEqual({ ok: false, alasan: "Admisi ini sudah selesai." });
+    expect(store.getState().tindakanAdmisi).toEqual(sebelum);
+  });
+
+  it("menolak resep baru pada admisi selesai", () => {
+    const { store, admisiId } = admisiSelesai();
+
+    const hasil = store.dispatch({
+      type: "resep/dibuat",
+      olehId: PENGGUNA_UJI.dokter,
+      admisiId,
+      items: [{ obatId: "obat-1", jumlah: 1, aturanPakai: "1×1" }],
+    });
+
+    expect(hasil).toEqual({ ok: false, alasan: "Admisi ini sudah selesai." });
+    expect(store.getState().resep).toHaveLength(0);
+  });
+});

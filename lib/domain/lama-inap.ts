@@ -23,3 +23,14 @@ export function geserTanggal(tanggal: Tanggal, hari: number): Tanggal {
   const ms = Date.UTC(Number(tanggal.slice(0, 4)), Number(tanggal.slice(5, 7)) - 1, Number(tanggal.slice(8, 10)));
   return new Date(ms + hari * MS_PER_DAY).toISOString().slice(0, 10);
 }
+
+/**
+ * Tanggal kalender lokal. Sengaja lokal, bukan UTC: stempel waktu dicatat dalam
+ * instan UTC, sehingga memotong sepuluh huruf pertama menaruh kejadian dinihari
+ * WIB pada hari sebelumnya.
+ */
+export function tanggalLokal(waktu: Date): Tanggal {
+  const bulan = String(waktu.getMonth() + 1).padStart(2, "0");
+  const tanggal = String(waktu.getDate()).padStart(2, "0");
+  return `${waktu.getFullYear()}-${bulan}-${tanggal}`;
+}

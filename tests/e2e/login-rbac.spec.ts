@@ -1,16 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { masukSebagai } from "./bantuan";
 
 /**
  * Setiap test memakai konteks peramban baru, sehingga localStorage kosong dan
  * data demo ditanam ulang oleh aplikasi. Test tidak bergantung pada urutan.
  */
-
-async function masukSebagai(page: import("@playwright/test").Page, nama: string) {
-  await page.goto("/login");
-  await page.getByRole("button", { name: new RegExp(nama) }).click();
-  await page.getByRole("button", { name: "Masuk" }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
-}
 
 test("halaman login menampilkan akun demo yang mengisi kredensial saat diklik", async ({ page }) => {
   await page.goto("/login");

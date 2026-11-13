@@ -2,6 +2,7 @@ import type { Action, Store, StoreDeps } from "./actions";
 import { cloneState } from "./state";
 import { audit } from "./audit";
 import { IZIN_AKSI, boleh } from "./izin";
+import { pasienDenganNik } from "./selectors";
 import { nilaiTagihan } from "./tagihan";
 import type { Admisi, Bed, Hasil, Pasien, State } from "./types";
 
@@ -51,7 +52,7 @@ function bedTersedia(state: State, bedId: string): { ok: true } | { ok: false; a
 const pasienDibuat: Handler<Extract<Action, { type: "pasien/dibuat" }>> = (draft, action, deps) => {
   const { input } = action;
   if (!input.nama.trim()) return { ok: false, alasan: "Nama pasien wajib diisi." };
-  if (draft.pasien.some((p) => p.nik === input.nik)) {
+  if (pasienDenganNik(draft, input.nik)) {
     return { ok: false, alasan: `NIK ${input.nik} sudah terdaftar. Periksa kembali data pasien.` };
   }
   const pasien: Pasien = {
@@ -322,6 +323,8 @@ const catatanDikoreksi: Handler<Extract<Action, { type: "catatan/dikoreksi" }>> 
 const resepDibuat: Handler<Extract<Action, { type: "resep/dibuat" }>> = (draft, action, deps) => {
   const admisi = draft.admisi.find((a) => a.id === action.admisiId);
   if (!admisi) return { ok: false, alasan: "Admisi tidak ditemukan." };
+  // Resep pada admisi selesai akan mengubah tagihan yang sudah ditutup.
+  if (admisi.status !== "aktif") return { ok: false, alasan: "Admisi ini sudah selesai." };
   if (action.items.length === 0) return { ok: false, alasan: "Resep harus memuat minimal satu obat." };
 
   const items = [];
@@ -440,6 +443,8 @@ const stokMasuk: Handler<Extract<Action, { type: "obat/stok-masuk" }>> = (draft,
 const tindakanDitambahkan: Handler<Extract<Action, { type: "tindakan/ditambahkan" }>> = (draft, action, deps) => {
   const admisi = draft.admisi.find((a) => a.id === action.admisiId);
   if (!admisi) return { ok: false, alasan: "Admisi tidak ditemukan." };
+  // Tindakan pada admisi selesai akan mengubah tagihan yang sudah ditutup.
+  if (admisi.status !== "aktif") return { ok: false, alasan: "Admisi ini sudah selesai." };
   const master = draft.tindakanMaster.find((t) => t.id === action.tindakanId);
   if (!master || !master.aktif) return { ok: false, alasan: "Tindakan ini tidak tersedia." };
 

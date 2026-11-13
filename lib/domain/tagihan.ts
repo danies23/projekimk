@@ -1,8 +1,9 @@
-import { lamaInap, selisihHari } from "./lama-inap";
+import { tanggalLokal, lamaInap, selisihHari } from "./lama-inap";
 import type { Admisi, Id, State, StatusTagihan, Tanggal } from "./types";
 
+/** Stempel waktu dicatat UTC; tanggal kalender harus dibaca di zona pengguna. */
 function tanggalDari(iso: string): Tanggal {
-  return iso.slice(0, 10);
+  return tanggalLokal(new Date(iso));
 }
 
 export interface BarisKamar {

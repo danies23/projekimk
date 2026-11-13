@@ -1,9 +1,12 @@
 import { buatDataDemo } from "./data-demo";
+import { tanggalLokal } from "./lama-inap";
 import { buatPenyimpananAman, type Penyimpanan } from "./penyimpanan";
 import { muatSnapshot, simpanSnapshot } from "./persistensi";
 import { createStore } from "./store";
 import type { Store } from "./actions";
-import type { State, Tanggal, Waktu } from "./types";
+import type { State, Waktu } from "./types";
+
+export { tanggalLokal };
 
 export interface OpsiStoreDemo {
   penyimpanan?: Penyimpanan;
@@ -12,12 +15,7 @@ export interface OpsiStoreDemo {
   sekarang?: () => Waktu;
 }
 
-/** Tanggal kalender lokal. Sengaja lokal, bukan UTC, agar cocok dengan "hari ini" bagi pengguna. */
-export function tanggalLokal(waktu: Date): Tanggal {
-  const bulan = String(waktu.getMonth() + 1).padStart(2, "0");
-  const tanggal = String(waktu.getDate()).padStart(2, "0");
-  return `${waktu.getFullYear()}-${bulan}-${tanggal}`;
-}
+/** Tanggal kalender lokal; dipakai semua pembacaan "hari ini" di aplikasi. */
 
 /**
  * Titik masuk state untuk aplikasi: memuat snapshot bila ada, selain itu

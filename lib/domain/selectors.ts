@@ -8,6 +8,11 @@ export function pilihPasienByNomorRM(state: State, nomorRM: string): Pasien | un
   return state.pasien.find((p) => p.nomorRM === nomorRM);
 }
 
+/** Dipakai formulir pendaftaran untuk memperingatkan NIK ganda sebelum disimpan. */
+export function pasienDenganNik(state: State, nik: string): Pasien | undefined {
+  return state.pasien.find((p) => p.nik === nik);
+}
+
 /**
  * Pencarian pasien menerima nama, NIK, atau Nomor Rekam Medis. Kata kunci
  * kosong sengaja tidak mengembalikan apa pun agar layar tidak menampilkan
