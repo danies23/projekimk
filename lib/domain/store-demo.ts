@@ -3,33 +3,43 @@ import { buatPenyimpananAman, type Penyimpanan } from "./penyimpanan";
 import { muatSnapshot, simpanSnapshot } from "./persistensi";
 import { createStore } from "./store";
 import type { Store } from "./actions";
-import type { State } from "./types";
+import type { State, Tanggal, Waktu } from "./types";
 
 export interface OpsiStoreDemo {
   penyimpanan?: Penyimpanan;
   hariIni?: string;
+  /** Jam yang dipakai untuk stempel waktu; disuntikkan pada test deterministik. */
+  sekarang?: () => Waktu;
 }
 
-function hariIniSekarang(): string {
-  const d = new Date();
-  const bulan = String(d.getMonth() + 1).padStart(2, "0");
-  const tanggal = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${bulan}-${tanggal}`;
+/** Tanggal kalender lokal. Sengaja lokal, bukan UTC, agar cocok dengan "hari ini" bagi pengguna. */
+function tanggalLokal(waktu: Date): Tanggal {
+  const bulan = String(waktu.getMonth() + 1).padStart(2, "0");
+  const tanggal = String(waktu.getDate()).padStart(2, "0");
+  return `${waktu.getFullYear()}-${bulan}-${tanggal}`;
 }
 
 /**
  * Titik masuk state untuk aplikasi: memuat snapshot bila ada, selain itu
- * menanam data demo, lalu menyimpan setiap perubahan penting.
+ * memakai data demo, lalu menyimpan setiap perubahan penting.
+ *
+ * `hariIni` dan `sekarang` sama-sama dibaca dari jam yang sama pada setiap
+ * pemanggilan. Kalau `hariIni` dibekukan saat pembuatan store sementara
+ * `sekarang` terus berjalan, melewati tengah malam akan membuat tanggal
+ * pulang dan tanggal transaksi berbeda satu hari dari dasar perhitungan biaya.
  */
 export function buatStoreDemo(opsi: OpsiStoreDemo = {}): Store {
-  const hari = opsi.hariIni ?? hariIniSekarang();
+  const jam = opsi.sekarang ?? (() => new Date().toISOString());
+  const hariAwal = opsi.hariIni ?? tanggalLokal(new Date(jam()));
   const penyimpanan = opsi.penyimpanan ?? buatPenyimpananAman(() => globalThis.localStorage ?? null);
 
-  const awal = buatDataDemo(hari);
+  const awal = buatDataDemo(hariAwal);
   const tersimpan = muatSnapshot(penyimpanan);
   const store = createStore(tersimpan ?? awal, {
-    hariIni: () => hari,
-    sekarang: () => new Date().toISOString(),
+    // Saat `hariIni` dipatok eksplisit (test), jangan biarkan jam menggeser
+    // tanggal di tengah skenario.
+    hariIni: () => opsi.hariIni ?? tanggalLokal(new Date(jam())),
+    sekarang: jam,
     id: (prefix) =>
       `${prefix}-${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10)}`,
   });

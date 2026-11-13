@@ -7,6 +7,19 @@ import type { Admisi, Bed, Hasil, Pasien, State } from "./types";
 
 type Handler<A extends Action> = (draft: State, action: A, deps: StoreDeps) => Hasil;
 
+/** Tanggal kalender harus `YYYY-MM-DD` yang benar-benar ada di kalender. */
+function tanggalValid(tanggal: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) return false;
+  const [tahun, bulan, hari] = tanggal.split("-").map(Number) as [number, number, number];
+  const d = new Date(Date.UTC(tahun, bulan - 1, hari));
+  return d.getUTCFullYear() === tahun && d.getUTCMonth() === bulan - 1 && d.getUTCDate() === hari;
+}
+
+/** Rupiah dan jumlah obat tidak boleh pecahan; sisa pecahan akan mengacaukan pembulatan tagihan. */
+function bulatPositif(nilai: number): boolean {
+  return Number.isInteger(nilai) && nilai > 0;
+}
+
 /** Nomor Rekam Medis = RM-<tahun>-<urut>, urut per tahun (GLOSSARY.md). */
 function nomorRM(state: State, hariIni: string): string {
   const tahun = hariIni.slice(0, 4);
@@ -37,6 +50,7 @@ function bedTersedia(state: State, bedId: string): { ok: true } | { ok: false; a
 
 const pasienDibuat: Handler<Extract<Action, { type: "pasien/dibuat" }>> = (draft, action, deps) => {
   const { input } = action;
+  if (!input.nama.trim()) return { ok: false, alasan: "Nama pasien wajib diisi." };
   if (draft.pasien.some((p) => p.nik === input.nik)) {
     return { ok: false, alasan: `NIK ${input.nik} sudah terdaftar. Periksa kembali data pasien.` };
   }
@@ -60,6 +74,13 @@ const admisiDibuat: Handler<Extract<Action, { type: "admisi/dibuat" }>> = (draft
   if (!pasien) return { ok: false, alasan: "Pasien tidak ditemukan." };
   const dokter = draft.pengguna.find((p) => p.id === action.dokterId && p.peran === "dokter" && p.aktif);
   if (!dokter) return { ok: false, alasan: "Pilih dokter penanggung jawab yang masih aktif." };
+
+  if (!tanggalValid(action.tanggalMasuk)) {
+    return { ok: false, alasan: "Tanggal masuk harus berupa tanggal kalender yang valid." };
+  }
+  if (action.tanggalMasuk > deps.hariIni()) {
+    return { ok: false, alasan: "Tanggal masuk tidak boleh di masa depan." };
+  }
 
   const tersedia = bedTersedia(draft, action.bedId);
   if (!tersedia.ok) return tersedia;
@@ -201,8 +222,8 @@ const checkout: Handler<Extract<Action, { type: "checkout" }>> = (draft, action,
 const pembayaranDicatat: Handler<Extract<Action, { type: "pembayaran/dicatat" }>> = (draft, action, deps) => {
   const tagihan = draft.tagihan.find((t) => t.id === action.tagihanId);
   if (!tagihan) return { ok: false, alasan: "Tagihan tidak ditemukan." };
-  if (!Number.isFinite(action.jumlah) || action.jumlah <= 0) {
-    return { ok: false, alasan: "Jumlah pembayaran harus lebih dari nol." };
+  if (!bulatPositif(action.jumlah)) {
+    return { ok: false, alasan: "Jumlah pembayaran harus bilangan bulat lebih dari nol." };
   }
   const nilai = nilaiTagihan(draft, tagihan.id, deps.hariIni());
   if (nilai.status === "lunas") {
@@ -307,7 +328,9 @@ const resepDibuat: Handler<Extract<Action, { type: "resep/dibuat" }>> = (draft, 
   for (const item of action.items) {
     const obat = draft.obat.find((o) => o.id === item.obatId);
     if (!obat) return { ok: false, alasan: `Obat ${item.obatId} tidak ditemukan di master obat.` };
-    if (item.jumlah <= 0) return { ok: false, alasan: `Jumlah ${obat.nama} harus lebih dari nol.` };
+    if (!bulatPositif(item.jumlah)) {
+      return { ok: false, alasan: `Jumlah ${obat.nama} harus bilangan bulat lebih dari nol.` };
+    }
     items.push({ obatId: obat.id, nama: obat.nama, jumlah: item.jumlah, aturanPakai: item.aturanPakai, harga: obat.harga });
   }
 
@@ -392,8 +415,8 @@ const resepSerahkan: Handler<Extract<Action, { type: "resep/serahkan" }>> = (dra
 const stokMasuk: Handler<Extract<Action, { type: "obat/stok-masuk" }>> = (draft, action, deps) => {
   const obat = draft.obat.find((o) => o.id === action.obatId);
   if (!obat) return { ok: false, alasan: "Obat tidak ditemukan." };
-  if (!Number.isFinite(action.jumlah) || action.jumlah <= 0) {
-    return { ok: false, alasan: "Jumlah barang masuk harus lebih dari nol." };
+  if (!bulatPositif(action.jumlah)) {
+    return { ok: false, alasan: "Jumlah barang masuk harus bilangan bulat lebih dari nol." };
   }
   obat.stok += action.jumlah;
   draft.mutasiStok.push({

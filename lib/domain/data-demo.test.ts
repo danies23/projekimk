@@ -117,3 +117,30 @@ describe("data demo", () => {
     expect(state.audit.length).toBeGreaterThan(0);
   });
 });
+
+describe("kualitas data demo", () => {
+  it("memberi setiap bed kode unik agar pesan penolakan tidak ambigu", () => {
+    const kode = state.bed.map((b) => b.kode);
+    expect(new Set(kode).size).toBe(kode.length);
+  });
+
+  it("memindahkan satu admisi ke kamar yang benar-benar berbeda", () => {
+    const pindah = state.admisi.filter((a) => a.segmenBed.length >= 2);
+    expect(pindah.length).toBeGreaterThanOrEqual(1);
+    const segmen = pindah[0]!.segmenBed;
+    expect(new Set(segmen.map((s) => s.kamarId)).size).toBeGreaterThanOrEqual(2);
+
+    // Tarif kamar berbeda, jadi biaya per segmen terlihat di tagihan demo.
+    const tarif = new Set(
+      segmen.map((s) => state.kamar.find((k) => k.id === s.kamarId)!.tarifHarian),
+    );
+    expect(tarif.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("menyertakan pasien dengan lebih dari satu riwayat admisi", () => {
+    const perPasien = new Map<string, number>();
+    for (const a of state.admisi) perPasien.set(a.pasienId, (perPasien.get(a.pasienId) ?? 0) + 1);
+
+    expect([...perPasien.values()].filter((n) => n > 1).length).toBeGreaterThanOrEqual(1);
+  });
+});

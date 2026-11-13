@@ -112,7 +112,9 @@ const JAM = ["08:15", "09:40", "11:05", "13:30", "15:20", "16:45"];
 export function buatDataDemo(hariIni: Tanggal): State {
   const kamar: Kamar[] = KAMAR_DAN_BED.map((k) => k.kamar);
   const bed: Bed[] = KAMAR_DAN_BED.flatMap((k) =>
-    k.bedIds.map((id, i) => ({ id, kamarId: k.kamar.id, kode: `${k.kamar.nama.split(" ")[0]}-${i + 1}`, status: "kosong" as const })),
+    // Kode memakai nama kamar utuh (mis. "Melati I-1-A"), bukan kata pertamanya
+    // saja, karena "Melati I-1" dan "Melati I-2" berbagi kata pertama.
+    k.bedIds.map((id, i) => ({ id, kamarId: k.kamar.id, kode: `${k.kamar.nama}-${String.fromCharCode(65 + i)}`, status: "kosong" as const })),
   );
 
   let tanggal = hariIni;
@@ -189,7 +191,9 @@ export function buatDataDemo(hariIni: Tanggal): State {
     const mulai = -62 + i * 3 + (i % 2);
     const lama = 2 + (i % 3);
     pada(mulai);
-    const pasienId = pasienIds[(i + 12) % pasienIds.length]!;
+    // Empat pasien pertama memakai ulang pasien yang juga punya admisi aktif,
+    // sehingga demo memuat riwayat lebih dari satu admisi per pasien.
+    const pasienId = i < 4 ? pasienIds[i]! : pasienIds[(i + 12) % pasienIds.length]!;
     const bedId = bedSiklus[i % bedSiklus.length]!;
     const dokterId = i % 2 === 0 ? ID.dokter : ID.dokter2;
 
@@ -263,9 +267,11 @@ export function buatDataDemo(hariIni: Tanggal): State {
   {
     const pindah = admisiAktif[4]!;
     pada(-4);
-    const hasil = store.dispatch({ type: "admisi/pindah-bed", olehId: ID.perawat, admisiId: pindah.admisiId, bedId: "bed-melati2-1" });
+    // Tujuan sengaja berada di kamar dan kelas lain (Melati I-2 ke Mawar II-2),
+    // supaya tagihan demo menunjukkan dua segmen dengan tarif berbeda.
+    const hasil = store.dispatch({ type: "admisi/pindah-bed", olehId: ID.perawat, admisiId: pindah.admisiId, bedId: "bed-mawar2-2" });
     if (!hasil.ok) throw new Error(`data demo pindah bed gagal: ${hasil.alasan}`);
-    pindah.bedId = "bed-melati2-1";
+    pindah.bedId = "bed-mawar2-2";
   }
 
   // Catatan klinis, instruksi, dan tanda vital.
