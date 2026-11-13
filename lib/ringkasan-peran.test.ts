@@ -16,7 +16,13 @@ function pengguna(peran: Pengguna["peran"], id = `u-${peran}`): Pengguna {
  */
 function stateContoh(): State {
   const dasar = buatStateKosong();
-  const segmen = (bedId: string, kamarId: string) => ({ bedId, kamarId, dari: "2026-03-01T08:00:00.000Z", sampai: null });
+  const segmen = (bedId: string, kamarId: string) => ({
+    bedId,
+    kamarId,
+    dari: "2026-03-01T08:00:00.000Z",
+    sampai: null,
+    tarifHarian: 500_000,
+  });
   return {
     ...dasar,
     kamar: [{ id: "kamar-1", nama: "Melati I-1", kelas: "I", tarifHarian: 500_000, aktif: true }],
@@ -70,7 +76,7 @@ function stateContoh(): State {
         tanggalPulang: "2026-02-05",
         diagnosaAwal: "Selesai",
         status: "selesai",
-        segmenBed: [{ bedId: "bed-2", kamarId: "kamar-1", dari: "2026-02-01T08:00:00.000Z", sampai: "2026-02-05T08:00:00.000Z" }],
+        segmenBed: [{ bedId: "bed-2", kamarId: "kamar-1", dari: "2026-02-01T08:00:00.000Z", sampai: "2026-02-05T08:00:00.000Z", tarifHarian: 500_000 }],
         overrideCheckout: null,
       },
     ],

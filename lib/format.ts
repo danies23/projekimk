@@ -21,6 +21,17 @@ export function formatTanggal(tanggal: string): string {
   });
 }
 
+/** Tanggal dan jam untuk kejadian bertanggal waktu, mis. "1 Maret 2026 pukul 16.00". */
+export function formatTanggalWaktu(iso: string): string {
+  return new Date(iso).toLocaleString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function formatAngka(nilai: number, satuan: SatuanAngka): string {
   if (satuan === "rupiah") return formatRupiah(nilai);
   if (satuan === "persen") return `${formatJumlah(nilai)}%`;

@@ -1,4 +1,4 @@
-import type { Hasil, Id, JenisCatatan, JenisKelamin, MetodePembayaran, Peran, State, Tanggal, TandaVital, Waktu } from "./types";
+import type { Hasil, Id, JenisCatatan, JenisKelamin, KelasKamar, MetodePembayaran, Peran, State, Tanggal, TandaVital, Waktu } from "./types";
 
 export interface InputPasien {
   nama: string;
@@ -24,6 +24,19 @@ export interface ActionAdmisiDibuat {
   bedId: Id;
   tanggalMasuk: Tanggal;
   diagnosaAwal: string;
+}
+
+export interface ActionKamarDibuat {
+  type: "kamar/dibuat";
+  olehId: Id;
+  input: { nama: string; kelas: KelasKamar; tarifHarian: number; kapasitas: number };
+}
+
+export interface ActionKamarDiubah {
+  type: "kamar/diubah";
+  olehId: Id;
+  kamarId: Id;
+  perubahan: Partial<{ nama: string; kelas: KelasKamar; tarifHarian: number; kapasitas: number; aktif: boolean }>;
 }
 
 export interface ActionPindahBed {
@@ -122,6 +135,8 @@ export interface ActionTindakanMasterDiubah {
 export type Action =
   | ActionPasienDibuat
   | ActionAdmisiDibuat
+  | ActionKamarDibuat
+  | ActionKamarDiubah
   | ActionPindahBed
   | ActionBedSiap
   | ActionCheckout

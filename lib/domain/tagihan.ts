@@ -67,6 +67,10 @@ function barisKamar(state: State, admisi: Admisi, hariIni: Tanggal): BarisKamar[
     const terakhir = index === admisi.segmenBed.length - 1;
     const sampai = terakhir ? akhirAdmisi : tanggalDari(segmen.sampai!);
     const lamaHari = terakhir ? selisihHari(dari, sampai) + 1 : selisihHari(dari, sampai);
+    // Tarif disalin saat segmen dibuka; perubahan master kamar tidak boleh
+    // menagih ulang masa inap yang sudah terjadi. Snapshot lama tanpa tarif
+    // memakai tarif kamar saat ini.
+    const tarifHarian = segmen.tarifHarian ?? kamar.tarifHarian;
     return [
       {
         bedId: segmen.bedId,
@@ -75,8 +79,8 @@ function barisKamar(state: State, admisi: Admisi, hariIni: Tanggal): BarisKamar[
         dari,
         sampai,
         lamaHari,
-        tarifHarian: kamar.tarifHarian,
-        subtotal: lamaHari * kamar.tarifHarian,
+        tarifHarian,
+        subtotal: lamaHari * tarifHarian,
       },
     ];
   });

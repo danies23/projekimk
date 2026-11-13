@@ -1,4 +1,4 @@
-import type { Admisi, Bed, Id, Kamar, KelasKamar, Pasien, Pengguna, State } from "./types";
+import type { Admisi, Bed, Id, Kamar, KelasKamar, Pasien, Pengguna, State, Waktu } from "./types";
 
 export function pilihPasienById(state: State, id: Id): Pasien | undefined {
   return state.pasien.find((p) => p.id === id);
@@ -92,6 +92,53 @@ export function denahBed(state: State): BedKamar[] {
     }));
 }
 
+/** Seluruh kamar termasuk yang nonaktif, untuk layar pengelolaan admin. */
+export function semuaKamar(state: State): Array<{ kamar: Kamar; bed: Bed[] }> {
+  return state.kamar.map((kamar) => ({
+    kamar,
+    bed: state.bed.filter((b) => b.kamarId === kamar.id),
+  }));
+}
+
+export interface RiwayatPindahBed {
+  admisiId: Id;
+  pasien: Pasien;
+  dariKamar: Kamar;
+  dariBed: Bed;
+  keKamar: Kamar;
+  keBed: Bed;
+  waktu: Waktu;
+}
+
+/** Riwayat perpindahan bed seluruh admisi, terbaru dulu, diturunkan dari segmen bed. */
+export function riwayatPindahBed(state: State): RiwayatPindahBed[] {
+  const baris: RiwayatPindahBed[] = [];
+  for (const admisi of state.admisi) {
+    const pasien = state.pasien.find((p) => p.id === admisi.pasienId);
+    if (!pasien) continue;
+    for (let i = 0; i < admisi.segmenBed.length - 1; i++) {
+      const dari = admisi.segmenBed[i]!;
+      const ke = admisi.segmenBed[i + 1]!;
+      const dariBed = state.bed.find((b) => b.id === dari.bedId);
+      const keBed = state.bed.find((b) => b.id === ke.bedId);
+      const dariKamar = state.kamar.find((k) => k.id === dari.kamarId);
+      const keKamar = state.kamar.find((k) => k.id === ke.kamarId);
+      // Bed yang sudah dihapus dari master tidak dapat ditampilkan namanya.
+      if (!dariBed || !keBed || !dariKamar || !keKamar) continue;
+      baris.push({
+        admisiId: admisi.id,
+        pasien,
+        dariKamar,
+        dariBed,
+        keKamar,
+        keBed,
+        waktu: ke.dari,
+      });
+    }
+  }
+  return baris.sort((a, b) => b.waktu.localeCompare(a.waktu));
+}
+
 /**
  * Pesan penolakan bed kosong; `null` berarti bed dapat dipilih. Dipakai
  * pemilih bed dan store supaya pesan "baru saja terisi" tidak ditulis dua kali.
@@ -99,6 +146,8 @@ export function denahBed(state: State): BedKamar[] {
 export function alasanBedTidakTersedia(state: State, bedId: Id): string | null {
   const target = state.bed.find((b) => b.id === bedId);
   if (!target) return "Bed tidak ditemukan.";
+  const kamar = state.kamar.find((k) => k.id === target.kamarId);
+  if (!kamar || !kamar.aktif) return `Bed ${target.kode} berada di kamar nonaktif. Pilih bed lain.`;
   if (target.status === "terisi") return `Bed ${target.kode} baru saja terisi, pilih bed lain.`;
   if (target.status === "dibersihkan") {
     return `Bed ${target.kode} belum siap dipakai. Tunggu sampai perawat menandainya siap.`;

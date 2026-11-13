@@ -127,6 +127,8 @@ export function menuUntuk(peran: Peran | null | undefined): typeof MODUL {
 export const IZIN_AKSI: Record<ActionType, Tindakan> = {
   "pasien/dibuat": "pasien.buat",
   "admisi/dibuat": "admisi.buat",
+  "kamar/dibuat": "master.kamar",
+  "kamar/diubah": "master.kamar",
   "admisi/pindah-bed": "bed.pindah",
   "bed/siap": "bed.siap",
   "catatan/ditulis": "catatan.tulis",

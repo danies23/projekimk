@@ -71,7 +71,7 @@ describe("dispatch: alokasi bed saat admisi dibuat", () => {
     store.dispatch({ ...ADMISI, pasienId, bedId: bed.id });
 
     expect(store.getState().admisi[0]!.segmenBed).toEqual([
-      { bedId: bed.id, kamarId: kamar.id, dari: "2026-03-01T09:00:00.000Z", sampai: null },
+      { bedId: bed.id, kamarId: kamar.id, dari: "2026-03-01T09:00:00.000Z", sampai: null, tarifHarian: 500_000 },
     ]);
   });
 

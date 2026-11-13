@@ -70,6 +70,8 @@ export interface SegmenBed {
   kamarId: Id;
   dari: Waktu;
   sampai: Waktu | null;
+  /** Tarif harian disalin saat segmen dibuka agar perubahan master tidak menagih ulang riwayat. */
+  tarifHarian: number;
 }
 
 export interface OverrideCheckout {

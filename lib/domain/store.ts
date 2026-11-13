@@ -33,6 +33,112 @@ function bed(state: State, bedId: string): Bed | undefined {
   return state.bed.find((b) => b.id === bedId);
 }
 
+/** Kode bed mengikuti nama kamar utuh, mis. "Melati I-1-A" (lihat data demo). */
+function kodeBed(namaKamar: string, urutan: number): string {
+  return `${namaKamar}-${String.fromCharCode(65 + urutan)}`;
+}
+
+function bedBaru(state: State, deps: StoreDeps, kamarId: string, namaKamar: string): Bed {
+  const urutan = state.bed.filter((b) => b.kamarId === kamarId).length;
+  return { id: deps.id("bed"), kamarId, kode: kodeBed(namaKamar, urutan), status: "kosong" };
+}
+
+function kamarValid(input: { nama: string; tarifHarian: number }): string | null {
+  if (!input.nama.trim()) return "Nama kamar wajib diisi.";
+  if (!bulatPositif(input.tarifHarian)) return "Tarif harian harus bilangan bulat lebih dari nol.";
+  return null;
+}
+
+const kamarDibuat: Handler<Extract<Action, { type: "kamar/dibuat" }>> = (draft, action, deps) => {
+  const { input } = action;
+  const galat = kamarValid(input);
+  if (galat) return { ok: false, alasan: galat };
+  if (!bulatPositif(input.kapasitas) || input.kapasitas > 26) {
+    return { ok: false, alasan: "Kapasitas harus bilangan bulat antara 1 dan 26 bed." };
+  }
+  const nama = input.nama.trim();
+  if (draft.kamar.some((k) => k.nama.toLowerCase() === nama.toLowerCase())) {
+    return { ok: false, alasan: `Kamar ${nama} sudah terdaftar.` };
+  }
+
+  const kamar = {
+    id: deps.id("kamar"),
+    nama,
+    kelas: input.kelas,
+    tarifHarian: input.tarifHarian,
+    aktif: true,
+  };
+  draft.kamar.push(kamar);
+  for (let i = 0; i < input.kapasitas; i++) draft.bed.push(bedBaru(draft, deps, kamar.id, nama));
+
+  audit(draft, deps, action.olehId, {
+    aksi: "kamar.dibuat",
+    entitas: "kamar",
+    entitasId: kamar.id,
+    ringkasan: `Kamar ${kamar.nama} (kelas ${kamar.kelas}) dibuat dengan ${input.kapasitas} bed.`,
+  });
+  return { ok: true, id: kamar.id };
+};
+
+const kamarDiubah: Handler<Extract<Action, { type: "kamar/diubah" }>> = (draft, action, deps) => {
+  const kamar = draft.kamar.find((k) => k.id === action.kamarId);
+  if (!kamar) return { ok: false, alasan: "Kamar tidak ditemukan." };
+  const { perubahan } = action;
+
+  const gabungan = { nama: perubahan.nama ?? kamar.nama, tarifHarian: perubahan.tarifHarian ?? kamar.tarifHarian };
+  const galat = kamarValid(gabungan);
+  if (galat) return { ok: false, alasan: galat };
+  const nama = gabungan.nama.trim();
+  if (draft.kamar.some((k) => k.id !== kamar.id && k.nama.toLowerCase() === nama.toLowerCase())) {
+    return { ok: false, alasan: `Kamar ${nama} sudah terdaftar.` };
+  }
+
+  const bedKamar = draft.bed.filter((b) => b.kamarId === kamar.id);
+  const kapasitasBaru = perubahan.kapasitas ?? bedKamar.length;
+  if (!bulatPositif(kapasitasBaru) || kapasitasBaru > 26) {
+    return { ok: false, alasan: "Kapasitas harus bilangan bulat antara 1 dan 26 bed." };
+  }
+  // Bed dihapus dari yang paling belakang. Bed yang masih ditempati atau yang
+  // pernah dipakai berpindah tidak boleh hilang: riwayat perpindahan dan
+  // segmen tagihan menunjuk id-nya.
+  const dihapus = bedKamar.slice(kapasitasBaru);
+  if (dihapus.some((b) => b.status === "terisi")) {
+    return { ok: false, alasan: "Kapasitas tidak dapat dikurangi: bed yang akan dihapus masih ditempati pasien." };
+  }
+  const pernahDitempati = new Set(draft.admisi.flatMap((a) => a.segmenBed.map((s) => s.bedId)));
+  if (dihapus.some((b) => pernahDitempati.has(b.id))) {
+    return {
+      ok: false,
+      alasan: "Kapasitas tidak dapat dikurangi: bed yang akan dihapus menyimpan riwayat perpindahan pasien.",
+    };
+  }
+  if (perubahan.aktif === false && bedKamar.some((b) => b.status === "terisi")) {
+    return { ok: false, alasan: "Kamar tidak dapat dinonaktifkan selama masih ada pasien dirawat di dalamnya." };
+  }
+
+  const namaLama = kamar.nama;
+  kamar.nama = nama;
+  kamar.kelas = perubahan.kelas ?? kamar.kelas;
+  kamar.tarifHarian = gabungan.tarifHarian;
+  kamar.aktif = perubahan.aktif ?? kamar.aktif;
+
+  for (const b of dihapus) draft.bed.splice(draft.bed.indexOf(b), 1);
+  // Kode bed ikut nama kamar; tanpa ini pesan "Bed Melati I-1-A terisi" menunjuk kamar yang salah.
+  const tersisa = bedKamar.slice(0, kapasitasBaru);
+  if (nama !== namaLama) tersisa.forEach((b, i) => void (b.kode = kodeBed(nama, i)));
+  if (kapasitasBaru > bedKamar.length) {
+    for (let i = bedKamar.length; i < kapasitasBaru; i++) draft.bed.push(bedBaru(draft, deps, kamar.id, nama));
+  }
+
+  audit(draft, deps, action.olehId, {
+    aksi: "kamar.diubah",
+    entitas: "kamar",
+    entitasId: kamar.id,
+    ringkasan: `Kamar ${kamar.nama} diperbarui (kelas ${kamar.kelas}, tarif Rp${kamar.tarifHarian.toLocaleString("id-ID")}, ${kapasitasBaru} bed, ${kamar.aktif ? "aktif" : "nonaktif"}).`,
+  });
+  return { ok: true, id: kamar.id };
+};
+
 /**
  * Satu bed hanya boleh menempati satu admisi aktif. Pesan penolakan hidup di
  * selector agar pemilih bed menampilkan kalimat yang persis sama.
@@ -80,6 +186,7 @@ const admisiDibuat: Handler<Extract<Action, { type: "admisi/dibuat" }>> = (draft
   if (!tersedia.ok) return tersedia;
 
   const target = bed(draft, action.bedId)!;
+  const kamarTarget = draft.kamar.find((k) => k.id === target.kamarId)!;
   const waktu = deps.sekarang();
   const admisi: Admisi = {
     id: deps.id("admisi"),
@@ -90,7 +197,9 @@ const admisiDibuat: Handler<Extract<Action, { type: "admisi/dibuat" }>> = (draft
     tanggalPulang: null,
     diagnosaAwal: action.diagnosaAwal,
     status: "aktif",
-    segmenBed: [{ bedId: target.id, kamarId: target.kamarId, dari: waktu, sampai: null }],
+    segmenBed: [
+      { bedId: target.id, kamarId: target.kamarId, dari: waktu, sampai: null, tarifHarian: kamarTarget.tarifHarian },
+    ],
     overrideCheckout: null,
   };
   draft.admisi.push(admisi);
@@ -124,6 +233,7 @@ const pindahBed: Handler<Extract<Action, { type: "admisi/pindah-bed" }>> = (draf
 
   const lama = bed(draft, admisi.bedId)!;
   const baru = bed(draft, action.bedId)!;
+  const kamarBaru = draft.kamar.find((k) => k.id === baru.kamarId)!;
   const waktu = deps.sekarang();
 
   lama.status = "dibersihkan";
@@ -131,7 +241,13 @@ const pindahBed: Handler<Extract<Action, { type: "admisi/pindah-bed" }>> = (draf
   admisi.bedId = baru.id;
   const segmenAkhir = admisi.segmenBed.at(-1);
   if (segmenAkhir) segmenAkhir.sampai = waktu;
-  admisi.segmenBed.push({ bedId: baru.id, kamarId: baru.kamarId, dari: waktu, sampai: null });
+  admisi.segmenBed.push({
+    bedId: baru.id,
+    kamarId: baru.kamarId,
+    dari: waktu,
+    sampai: null,
+    tarifHarian: kamarBaru.tarifHarian,
+  });
 
   const pasien = draft.pasien.find((p) => p.id === admisi.pasienId);
   audit(draft, deps, action.olehId, {
@@ -477,6 +593,8 @@ const tindakanMasterDiubah: Handler<Extract<Action, { type: "tindakan-master/diu
 const handlers: { [K in Action["type"]]: Handler<Extract<Action, { type: K }>> } = {
   "pasien/dibuat": pasienDibuat,
   "admisi/dibuat": admisiDibuat,
+  "kamar/dibuat": kamarDibuat,
+  "kamar/diubah": kamarDiubah,
   "admisi/pindah-bed": pindahBed,
   "bed/siap": bedSiap,
   checkout,
