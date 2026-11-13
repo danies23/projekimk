@@ -1,4 +1,17 @@
-import type { Admisi, Bed, Id, Kamar, KelasKamar, Pasien, Pengguna, State, Waktu } from "./types";
+import type {
+  Admisi,
+  Bed,
+  CatatanKlinis,
+  Id,
+  Kamar,
+  KelasKamar,
+  Pasien,
+  Pengguna,
+  Resep,
+  State,
+  TindakanAdmisi,
+  Waktu,
+} from "./types";
 
 export function pilihPasienById(state: State, id: Id): Pasien | undefined {
   return state.pasien.find((p) => p.id === id);
@@ -197,6 +210,45 @@ export interface BarisAdmisiAktif {
   namaKamar: string;
   namaDokter: string;
   tanggalMasuk: string;
+}
+
+/** Admisi aktif yang menjadi tanggung jawab satu dokter, terbaru dulu. */
+export function admisiUntukDokter(state: State, dokterId: Id): InfoAdmisi[] {
+  return daftarAdmisiAktif(state).filter((info) => info.dokter.id === dokterId);
+}
+
+/** Total tarif tindakan pada satu admisi; `olehId` membatasi pada pencatatnya. */
+export function totalTindakan(state: State, admisiId: Id, olehId?: Id): number {
+  return state.tindakanAdmisi
+    .filter((t) => t.admisiId === admisiId && (olehId === undefined || t.olehId === olehId))
+    .reduce((n, t) => n + t.tarif, 0);
+}
+
+export type ItemRiwayat =
+  | { jenis: "catatan"; waktu: Waktu; admisiId: Id; penulis: Pengguna | null; catatan: CatatanKlinis }
+  | { jenis: "tindakan"; waktu: Waktu; admisiId: Id; oleh: Pengguna | null; tindakan: TindakanAdmisi }
+  | { jenis: "resep"; waktu: Waktu; admisiId: Id; dokter: Pengguna | null; resep: Resep };
+
+/**
+ * Riwayat klinis satu pasien lintas admisi, terbaru dulu. Catatan, tindakan,
+ * dan resep disatukan agar dokter membaca satu garis waktu, bukan tiga daftar.
+ */
+export function riwayatKlinis(state: State, pasienId: Id): ItemRiwayat[] {
+  const admisiIds = new Set(admisiUntukPasien(state, pasienId).map((a) => a.id));
+  const penulis = (id: Id) => state.pengguna.find((p) => p.id === id) ?? null;
+
+  const item: ItemRiwayat[] = [
+    ...state.catatanKlinis
+      .filter((c) => admisiIds.has(c.admisiId))
+      .map((c): ItemRiwayat => ({ jenis: "catatan", waktu: c.waktu, admisiId: c.admisiId, penulis: penulis(c.penulisId), catatan: c })),
+    ...state.tindakanAdmisi
+      .filter((t) => admisiIds.has(t.admisiId))
+      .map((t): ItemRiwayat => ({ jenis: "tindakan", waktu: t.waktu, admisiId: t.admisiId, oleh: penulis(t.olehId), tindakan: t })),
+    ...state.resep
+      .filter((r) => admisiIds.has(r.admisiId))
+      .map((r): ItemRiwayat => ({ jenis: "resep", waktu: r.waktu, admisiId: r.admisiId, dokter: penulis(r.dokterId), resep: r })),
+  ];
+  return item.sort((a, b) => b.waktu.localeCompare(a.waktu));
 }
 
 /** Admisi aktif untuk daftar "pasien ini dirawat di mana", terbaru dulu. */

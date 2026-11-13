@@ -4,16 +4,16 @@
 
 **Blocked by:** 06 (Penyelesaian pendaftaran, admisi, dan bukti pendaftaran)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Dokter melihat daftar pasien yang dirawat di bawah tanggung jawabnya.
-- [ ] Detail admisi menampilkan identitas pasien, bed, tanggal masuk, dan diagnosa awal sebagai konteks sebelum menulis.
-- [ ] Dokter dapat menulis catatan visite berisi isi visite, diagnosa, dan rencana.
-- [ ] Dokter dapat menambahkan tindakan dari master tindakan, dan tarif tindakan tersebut langsung masuk ke rincian tagihan admisi.
-- [ ] Dokter dapat melihat total biaya tindakan yang telah ia tambahkan pada admisi tersebut.
-- [ ] Dokter dapat membuat resep berisi beberapa obat dengan jumlah dan aturan pakai; resep masuk ke antrean farmasi dengan status `menunggu`.
-- [ ] Dokter dapat melihat status setiap resep yang ia buat.
-- [ ] Riwayat klinis pasien ditampilkan dalam urutan waktu dan memuat catatan visite, tindakan, resep, serta catatan perawat.
-- [ ] Tidak ada aksi yang menghapus catatan klinis.
-- [ ] Koreksi dibuat sebagai catatan baru yang menunjuk catatan asli, dan catatan asli ditandai telah dikoreksi.
-- [ ] Penulisan catatan, penambahan tindakan, pembuatan resep, dan koreksi tercatat di audit log.
+- [x] Dokter melihat daftar pasien yang dirawat di bawah tanggung jawabnya.
+- [x] Detail admisi menampilkan identitas pasien, bed, tanggal masuk, dan diagnosa awal sebagai konteks sebelum menulis.
+- [x] Dokter dapat menulis catatan visite berisi isi visite, diagnosa, dan rencana.
+- [x] Dokter dapat menambahkan tindakan dari master tindakan, dan tarif tindakan tersebut langsung masuk ke rincian tagihan admisi.
+- [x] Dokter dapat melihat total biaya tindakan yang telah ia tambahkan pada admisi tersebut.
+- [x] Dokter dapat membuat resep berisi beberapa obat dengan jumlah dan aturan pakai; resep masuk ke antrean farmasi dengan status `menunggu`.
+- [x] Dokter dapat melihat status setiap resep yang ia buat.
+- [x] Riwayat klinis pasien ditampilkan dalam urutan waktu dan memuat catatan visite, tindakan, resep, serta catatan perawat.
+- [x] Tidak ada aksi yang menghapus catatan klinis.
+- [x] Koreksi dibuat sebagai catatan baru yang menunjuk catatan asli, dan catatan asli ditandai telah dikoreksi.
+- [x] Penulisan catatan, penambahan tindakan, pembuatan resep, dan koreksi tercatat di audit log.
