@@ -14,7 +14,7 @@ import {
   type InfoAdmisi,
   type ItemRiwayat,
 } from "@/lib/domain/selectors";
-import type { Id, StatusResep } from "@/lib/domain/types";
+import type { CatatanKlinis, Id, StatusResep } from "@/lib/domain/types";
 import { formatRupiah, formatTanggal, formatTanggalWaktu } from "@/lib/format";
 
 const LABEL_RESEP: Record<StatusResep, string> = {
@@ -35,6 +35,11 @@ const LABEL_JENIS_CATATAN = {
   perkembangan: "Catatan perkembangan",
   tanda_vital: "Tanda vital",
 } as const;
+
+/** Kutipan singkat supaya penunjuk koreksi muat satu baris. */
+function potong(teks: string): string {
+  return teks.length > 80 ? `${teks.slice(0, 80)}…` : teks;
+}
 
 interface BarisResep {
   kunci: number;
@@ -275,15 +280,20 @@ function FormVisite({
   const [isi, setIsi] = useState("");
   const [diagnosa, setDiagnosa] = useState("");
   const [rencana, setRencana] = useState("");
-  const [galatIsi, setGalatIsi] = useState<string | null>(null);
+  const [galat, setGalat] = useState<{ isi?: string; diagnosa?: string; rencana?: string }>({});
 
   function simpan(e: React.FormEvent) {
     e.preventDefault();
-    if (!isi.trim()) {
-      setGalatIsi("Isi visite wajib diisi.");
-      return;
-    }
-    setGalatIsi(null);
+    // Visite selalu memuat ketiganya (user story 42); catatan perawat memakai
+    // aksi store yang sama dengan diagnosa dan rencana kosong.
+    const salah = {
+      isi: isi.trim() ? undefined : "Isi visite wajib diisi.",
+      diagnosa: diagnosa.trim() ? undefined : "Diagnosa wajib diisi.",
+      rencana: rencana.trim() ? undefined : "Rencana wajib diisi.",
+    };
+    setGalat(salah);
+    if (salah.isi || salah.diagnosa || salah.rencana) return;
+
     const berhasil = onAksi(
       {
         type: "catatan/ditulis",
@@ -291,8 +301,8 @@ function FormVisite({
         admisiId,
         jenis: "visite",
         isi,
-        diagnosa: diagnosa.trim() || null,
-        rencana: rencana.trim() || null,
+        diagnosa: diagnosa.trim(),
+        rencana: rencana.trim(),
         tandaVital: null,
       },
       "Catatan visite tersimpan.",
@@ -320,15 +330,15 @@ function FormVisite({
             value={isi}
             onChange={(e) => {
               setIsi(e.target.value);
-              setGalatIsi(null);
+              setGalat((lama) => ({ ...lama, isi: undefined }));
             }}
-            aria-invalid={galatIsi ? true : undefined}
-            aria-describedby={galatIsi ? "visite-isi-galat" : undefined}
+            aria-invalid={galat.isi ? true : undefined}
+            aria-describedby={galat.isi ? "visite-isi-galat" : undefined}
             className="mt-1 w-full rounded-md border border-border bg-canvas px-3 py-2 text-body text-text"
           />
-          {galatIsi ? (
+          {galat.isi ? (
             <p id="visite-isi-galat" role="alert" className="mt-1 text-caption text-danger">
-              {galatIsi}
+              {galat.isi}
             </p>
           ) : null}
         </div>
@@ -340,9 +350,19 @@ function FormVisite({
             id="visite-diagnosa"
             type="text"
             value={diagnosa}
-            onChange={(e) => setDiagnosa(e.target.value)}
+            onChange={(e) => {
+              setDiagnosa(e.target.value);
+              setGalat((lama) => ({ ...lama, diagnosa: undefined }));
+            }}
+            aria-invalid={galat.diagnosa ? true : undefined}
+            aria-describedby={galat.diagnosa ? "visite-diagnosa-galat" : undefined}
             className="mt-1 min-h-11 w-full rounded-md border border-border bg-canvas px-3 text-body text-text"
           />
+          {galat.diagnosa ? (
+            <p id="visite-diagnosa-galat" role="alert" className="mt-1 text-caption text-danger">
+              {galat.diagnosa}
+            </p>
+          ) : null}
         </div>
         <div>
           <label htmlFor="visite-rencana" className="block text-small font-medium text-text">
@@ -352,9 +372,19 @@ function FormVisite({
             id="visite-rencana"
             rows={2}
             value={rencana}
-            onChange={(e) => setRencana(e.target.value)}
+            onChange={(e) => {
+              setRencana(e.target.value);
+              setGalat((lama) => ({ ...lama, rencana: undefined }));
+            }}
+            aria-invalid={galat.rencana ? true : undefined}
+            aria-describedby={galat.rencana ? "visite-rencana-galat" : undefined}
             className="mt-1 w-full rounded-md border border-border bg-canvas px-3 py-2 text-body text-text"
           />
+          {galat.rencana ? (
+            <p id="visite-rencana-galat" role="alert" className="mt-1 text-caption text-danger">
+              {galat.rencana}
+            </p>
+          ) : null}
         </div>
         <button type="submit" className={tombolUtama}>
           Simpan catatan visite
@@ -440,18 +470,25 @@ function BagianTindakan({
           <thead>
             <tr className="border-b border-border text-left">
               <th scope="col" className="py-2 font-semibold">Tindakan</th>
+              <th scope="col" className="py-2 font-semibold">Dicatat oleh</th>
               <th scope="col" className="py-2 font-semibold">Waktu</th>
               <th scope="col" className="py-2 text-right font-semibold">Tarif</th>
             </tr>
           </thead>
           <tbody>
-            {tercatat.map((t) => (
-              <tr key={t.id} className="border-b border-border last:border-b-0">
-                <th scope="row" className="py-2 text-left font-medium text-text">{t.nama}</th>
-                <td className="py-2 text-text-muted">{formatTanggalWaktu(t.waktu)}</td>
-                <td className="py-2 text-right text-text">{formatRupiah(t.tarif)}</td>
-              </tr>
-            ))}
+            {tercatat.map((t) => {
+              const pencatat = state.pengguna.find((p) => p.id === t.olehId);
+              return (
+                <tr key={t.id} className="border-b border-border last:border-b-0">
+                  <th scope="row" className="py-2 text-left font-medium text-text">{t.nama}</th>
+                  <td className="py-2 text-text-muted">
+                    {t.olehId === penggunaId ? "Anda" : pencatat?.nama ?? "—"}
+                  </td>
+                  <td className="py-2 text-text-muted">{formatTanggalWaktu(t.waktu)}</td>
+                  <td className="py-2 text-right text-text">{formatRupiah(t.tarif)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
@@ -658,6 +695,7 @@ function RiwayatKlinis({
 }) {
   const state = useSelector((s) => s);
   const riwayat = riwayatKlinis(state, pasienId);
+  const catatanById = new Map(state.catatanKlinis.map((c) => [c.id, c]));
   const [koreksiId, setKoreksiId] = useState<Id | null>(null);
   const [isiKoreksi, setIsiKoreksi] = useState("");
   const [galatKoreksi, setGalatKoreksi] = useState<string | null>(null);
@@ -713,6 +751,8 @@ function RiwayatKlinis({
                 {item.jenis === "catatan" ? (
                   <IsiCatatan
                     item={item}
+                    asal={item.catatan.koreksiUntukId ? catatanById.get(item.catatan.koreksiUntukId) ?? null : null}
+                    koreksi={item.catatan.dikoreksiOlehId ? catatanById.get(item.catatan.dikoreksiOlehId) ?? null : null}
                     koreksiId={koreksiId}
                     isiKoreksi={isiKoreksi}
                     galatKoreksi={galatKoreksi}
@@ -761,6 +801,8 @@ function RiwayatKlinis({
 
 function IsiCatatan({
   item,
+  asal,
+  koreksi,
   koreksiId,
   isiKoreksi,
   galatKoreksi,
@@ -770,6 +812,10 @@ function IsiCatatan({
   onSimpanKoreksi,
 }: {
   item: Extract<ItemRiwayat, { jenis: "catatan" }>;
+  /** Catatan asli bila entri ini koreksi. */
+  asal: CatatanKlinis | null;
+  /** Entri koreksi bila catatan ini sudah dikoreksi. */
+  koreksi: CatatanKlinis | null;
   koreksiId: Id | null;
   isiKoreksi: string;
   galatKoreksi: string | null;
@@ -793,6 +839,18 @@ function IsiCatatan({
           </span>
         ) : null}
       </p>
+      {/* Penunjuk dua arah: pembaca catatan asli tahu ke mana koreksinya, dan
+          pembaca koreksi tahu catatan mana yang digantikannya. */}
+      {catatan.koreksiUntukId && asal ? (
+        <p className="mt-1 text-caption text-info">
+          Mengoreksi catatan: &ldquo;{potong(asal.isi)}&rdquo;
+        </p>
+      ) : null}
+      {catatan.dikoreksiOlehId && koreksi ? (
+        <p className="mt-1 text-caption text-warning">
+          Dikoreksi oleh catatan: &ldquo;{potong(koreksi.isi)}&rdquo;
+        </p>
+      ) : null}
       <p className="mt-1 whitespace-pre-line text-body text-text">{catatan.isi}</p>
       {catatan.diagnosa ? (
         <p className="mt-1 text-small text-text">
@@ -815,7 +873,8 @@ function IsiCatatan({
       ) : null}
       <p className="mt-1 text-caption text-text-muted">Ditulis oleh {penulis?.nama ?? "—"}</p>
 
-      {!catatan.dikoreksiOlehId && !sedangDikoreksi ? (
+      {/* Koreksi tidak dapat dikoreksi; tombolnya hanya untuk catatan asli. */}
+      {!catatan.dikoreksiOlehId && !catatan.koreksiUntukId && !sedangDikoreksi ? (
         <button type="button" onClick={onMulaiKoreksi} className={`mt-2 ${tombolSekunderKecil}`}>
           Koreksi catatan
           {/* Nama tombol sama di setiap entri; waktu membedakannya bagi pembaca layar. */}

@@ -120,6 +120,28 @@ describe("dispatch: rekam medis", () => {
     expect(hasil).toEqual({ ok: false, alasan: expect.stringContaining("sudah dikoreksi") });
   });
 
+  it("menolak mengoreksi entri koreksi, agar satu catatan hanya punya satu koreksi", () => {
+    const { store, admisiId } = denganAdmisi();
+    const asli = store.dispatch({
+      type: "catatan/ditulis",
+      olehId: PENGGUNA_UJI.dokter,
+      admisiId,
+      jenis: "visite",
+      isi: "Suhu 39 derajat",
+      diagnosa: null,
+      rencana: null,
+      tandaVital: null,
+    });
+    if (!asli.ok) throw new Error("setup gagal");
+    const koreksi = store.dispatch({ type: "catatan/dikoreksi", olehId: PENGGUNA_UJI.dokter, catatanId: asli.id, isi: "Suhu 38 derajat" });
+    if (!koreksi.ok) throw new Error(koreksi.alasan);
+
+    const hasil = store.dispatch({ type: "catatan/dikoreksi", olehId: PENGGUNA_UJI.dokter, catatanId: koreksi.id, isi: "Koreksi kedua" });
+
+    expect(hasil).toEqual({ ok: false, alasan: expect.stringContaining("koreksi") });
+    expect(store.getState().catatanKlinis).toHaveLength(2);
+  });
+
   it("mencatat penulisan dan koreksi di audit log", () => {
     const { store, admisiId } = denganAdmisi();
     const asli = store.dispatch({

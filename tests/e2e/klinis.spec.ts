@@ -36,6 +36,20 @@ test("dokter melihat pasien tanggung jawabnya dan konteks admisi sebelum menulis
   await expect(konteks).toContainText("Diagnosa awal");
 });
 
+test("visite menolak catatan tanpa diagnosa atau rencana", async ({ page }) => {
+  await bukaKlinis(page);
+  await pilihPasien(page, "Siti Rahmawati");
+
+  await page.getByLabel("Isi visite").fill("Pasien membaik.");
+  await page.getByRole("button", { name: "Simpan catatan visite" }).click();
+
+  await expect(page.getByText("Diagnosa wajib diisi.")).toBeVisible();
+  await expect(page.getByText("Rencana wajib diisi.")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Riwayat klinis pasien" }).getByText("Pasien membaik."),
+  ).toHaveCount(0);
+});
+
 test("visite, tindakan, dan resep langsung tercatat pada riwayat", async ({ page }) => {
   await bukaKlinis(page);
   await pilihPasien(page, "Siti Rahmawati");
@@ -80,14 +94,21 @@ test("riwayat klinis menampilkan catatan perawat dan penanda koreksi", async ({ 
   // Catatan perawat ikut terbaca dokter.
   await expect(riwayat).toContainText("Catatan perkembangan");
   await expect(riwayat).toContainText("Ditulis oleh Ns. Dwi Lestari");
-  // Catatan yang dikoreksi pada seed ditandai, dan koreksinya tampil.
+  // Catatan yang dikoreksi pada seed ditandai dan menunjuk koreksinya.
   await expect(riwayat).toContainText("Telah dikoreksi");
+  await expect(riwayat).toContainText("Dikoreksi oleh catatan:");
   await expect(riwayat).toContainText("Koreksi: demam turun sejak kemarin");
 
-  await riwayat.getByRole("button", { name: "Koreksi catatan" }).first().click();
+  // Catatan perawat yang belum dikoreksi pada seed.
+  const catatanBiasa = riwayat
+    .locator("li")
+    .filter({ hasText: "Pasien tidur nyenyak, intake cairan cukup, mobilisasi dibantu." });
+  await catatanBiasa.getByRole("button", { name: /Koreksi catatan/ }).click();
   await page.getByLabel("Isi koreksi").fill("Koreksi: tekanan darah 120/80, nadi 80.");
   await page.getByRole("button", { name: "Simpan koreksi" }).click();
 
   await expect(riwayat).toContainText("Koreksi: tekanan darah 120/80, nadi 80.");
+  // Dua pasangan asli–koreksi: satu dari seed, satu baru.
   await expect(riwayat.getByText("Telah dikoreksi")).toHaveCount(2);
+  await expect(riwayat.getByText(/Mengoreksi catatan:/)).toHaveCount(2);
 });

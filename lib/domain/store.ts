@@ -408,6 +408,11 @@ const catatanDitulis: Handler<Extract<Action, { type: "catatan/ditulis" }>> = (d
 const catatanDikoreksi: Handler<Extract<Action, { type: "catatan/dikoreksi" }>> = (draft, action, deps) => {
   const asli = draft.catatanKlinis.find((c) => c.id === action.catatanId);
   if (!asli) return { ok: false, alasan: "Catatan tidak ditemukan." };
+  // Koreksi hanya menunjuk catatan asli; mengoreksi koreksi membuat rantai yang
+  // tidak bisa dibaca sebagai satu pasangan asli–koreksi.
+  if (asli.koreksiUntukId) {
+    return { ok: false, alasan: "Entri koreksi tidak dapat dikoreksi lagi; koreksi catatan aslinya." };
+  }
   if (asli.dikoreksiOlehId) return { ok: false, alasan: "Catatan ini sudah dikoreksi." };
   if (!action.isi.trim()) return { ok: false, alasan: "Isi koreksi tidak boleh kosong." };
 
