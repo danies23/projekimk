@@ -42,14 +42,14 @@ export default function DesignSystemPage() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-10">
-        <h1 className="text-[2.25rem]">Sistem Desain</h1>
+        <h1 className="text-display">Sistem Desain</h1>
         <p className="mt-3 max-w-2xl text-text-muted">
           Acuan visual Dani Medical Center. Setiap warna, ukuran teks, radius, dan bayangan di aplikasi
           berasal dari token di halaman ini — komponen tidak boleh memakai nilai mentah.
         </p>
 
         <section aria-labelledby="palet" className="mt-12">
-          <h2 id="palet" className="text-[1.75rem]">
+          <h2 id="palet" className="text-heading">
             Palet warna
           </h2>
           <p className="mt-2 text-small text-text-muted">Palet biru-teal lembut dengan kontras teks memenuhi WCAG 2.1 AA.</p>
@@ -67,7 +67,7 @@ export default function DesignSystemPage() {
         </section>
 
         <section aria-labelledby="tipografi" className="mt-12">
-          <h2 id="tipografi" className="text-[1.75rem]">
+          <h2 id="tipografi" className="text-heading">
             Tipografi
           </h2>
           <p className="mt-2 text-small text-text-muted">
@@ -90,7 +90,7 @@ export default function DesignSystemPage() {
         </section>
 
         <section aria-labelledby="komponen" className="mt-12">
-          <h2 id="komponen" className="text-[1.75rem]">
+          <h2 id="komponen" className="text-heading">
             Komponen dasar
           </h2>
           <p className="mt-2 text-small text-text-muted">

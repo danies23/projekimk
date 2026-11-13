@@ -15,3 +15,5 @@
 - [ ] Playwright berjalan dan memuat setidaknya satu skenario yang membuka aplikasi di peramban dan hijau.
 - [ ] Perintah `test`, `test:e2e`, `lint`, dan `build` terdokumentasi dan berhasil tanpa error.
 - [ ] Aplikasi ter-deploy ke Vercel dan dapat dibuka dari perangkat lain.
+
+> Deploy: https://dani-medical-center.vercel.app — terverifikasi HTTP 200 tanpa autentikasi.

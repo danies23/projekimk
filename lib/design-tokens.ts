@@ -36,8 +36,8 @@ export interface ContrastPair {
 
 /**
  * Text/background pairings the interface actually renders. Each entry carries
- * the WCAG 2.1 AA threshold it must clear: 4.5:1 for body text, 3:1 for large
- * text and meaningful non-text indicators.
+ * the WCAG 2.1 AA threshold it must clear. 4.5:1 covers body text; 3:1 covers
+ * large text and meaningful non-text indicators such as a focus ring.
  */
 export const contrastPairs: ContrastPair[] = [
   { name: "text on surface", foreground: semanticColors.text, background: semanticColors.surface, minimum: 4.5 },
@@ -58,6 +58,13 @@ export const contrastPairs: ContrastPair[] = [
   { name: "warning on surfaceMuted", foreground: semanticColors.warning, background: semanticColors.surfaceMuted, minimum: 4.5 },
   { name: "danger on surfaceMuted", foreground: semanticColors.danger, background: semanticColors.surfaceMuted, minimum: 4.5 },
   { name: "info on surfaceMuted", foreground: semanticColors.info, background: semanticColors.surfaceMuted, minimum: 4.5 },
+  // Status badges: white label on each solid status colour.
+  { name: "onPrimary on success badge", foreground: semanticColors.onPrimary, background: semanticColors.success, minimum: 4.5 },
+  { name: "onPrimary on warning badge", foreground: semanticColors.onPrimary, background: semanticColors.warning, minimum: 4.5 },
+  { name: "onPrimary on danger badge", foreground: semanticColors.onPrimary, background: semanticColors.danger, minimum: 4.5 },
+  { name: "onPrimary on info badge", foreground: semanticColors.onPrimary, background: semanticColors.info, minimum: 4.5 },
+  // Non-text indicator: the focus ring must be distinguishable from the page.
+  { name: "focus ring on canvas", foreground: semanticColors.primary, background: semanticColors.canvas, minimum: 3 },
 ];
 
 /** Type scale. Sizes are rem so browser zoom is honoured. */

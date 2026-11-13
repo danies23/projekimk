@@ -2,6 +2,8 @@
 
 Prototipe interaktif sistem administrasi rawat inap untuk **Dani Medical Center**, dibuat sebagai tugas mata kuliah Interaksi Manusia dan Komputer. Yang dinilai adalah kualitas UI dan UX, bukan implementasi backend.
 
+**Demo:** https://dani-medical-center.vercel.app
+
 ## Menjalankan
 
 ```bash

@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  reactStrictMode: true,
-};
+// React strict mode is always on for the App Router, so it needs no flag here.
+const nextConfig: NextConfig = {};
 
 export default nextConfig;
