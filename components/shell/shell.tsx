@@ -45,7 +45,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas">
-      <header role="banner" className="border-b border-border bg-surface">
+      <header role="banner" className="border-b border-border bg-surface no-print">
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 lg:px-6">
           <Link href="/dashboard" className="rounded-sm">
             <Wordmark />

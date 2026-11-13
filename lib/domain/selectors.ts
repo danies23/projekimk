@@ -109,3 +109,51 @@ export function alasanBedTidakTersedia(state: State, bedId: Id): string | null {
 export function tagihanUntukAdmisi(state: State, admisiId: Id) {
   return state.tagihan.find((t) => t.admisiId === admisiId);
 }
+
+export interface InfoAdmisi {
+  admisiId: Id;
+  pasien: Pasien;
+  dokter: Pengguna;
+  kamar: Kamar;
+  bed: Bed;
+  tanggalMasuk: string;
+  diagnosaAwal: string;
+}
+
+/** Satu admisi dengan relasi yang selalu dibutuhkan layar bukti dan konfirmasi. */
+export function infoAdmisi(state: State, admisiId: Id): InfoAdmisi | null {
+  const admisi = state.admisi.find((a) => a.id === admisiId);
+  if (!admisi) return null;
+  const pasien = state.pasien.find((p) => p.id === admisi.pasienId);
+  const dokter = state.pengguna.find((p) => p.id === admisi.dokterId);
+  const bed = state.bed.find((b) => b.id === admisi.bedId);
+  const kamar = bed ? state.kamar.find((k) => k.id === bed.kamarId) : undefined;
+  if (!pasien || !dokter || !bed || !kamar) return null;
+  return {
+    admisiId: admisi.id,
+    pasien,
+    dokter,
+    kamar,
+    bed,
+    tanggalMasuk: admisi.tanggalMasuk,
+    diagnosaAwal: admisi.diagnosaAwal,
+  };
+}
+
+export interface BarisAdmisiAktif {
+  admisiId: Id;
+  namaPasien: string;
+  nomorRM: string;
+  kodeBed: string;
+  namaKamar: string;
+  namaDokter: string;
+  tanggalMasuk: string;
+}
+
+/** Admisi aktif untuk daftar "pasien ini dirawat di mana", terbaru dulu. */
+export function daftarAdmisiAktif(state: State): InfoAdmisi[] {
+  return admisiAktif(state)
+    .map((a) => infoAdmisi(state, a.id))
+    .filter((info): info is InfoAdmisi => !!info)
+    .sort((a, b) => b.tanggalMasuk.localeCompare(a.tanggalMasuk));
+}

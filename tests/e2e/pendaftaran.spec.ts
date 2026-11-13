@@ -3,7 +3,8 @@ import { masukSebagai } from "./bantuan";
 
 /**
  * Wizard pendaftaran: langkah 1 mencari pasien lama atau membuat pasien baru,
- * langkah 2 memilih dokter, tanggal masuk, diagnosa awal, dan bed.
+ * langkah 2 memilih dokter, tanggal masuk, diagnosa awal, dan bed, langkah 3
+ * mengonfirmasi lalu menyimpan admisi dan menampilkan bukti pendaftaran.
  * Setiap test memakai konteks peramban baru, sehingga data demo ditanam ulang
  * dan Nomor Rekam Medis yang dibuat test tidak bergantung pada urutan.
  */
@@ -229,4 +230,122 @@ test("daftar dokter hanya memuat dokter yang aktif", async ({ page }) => {
   await expect(dokter.getByRole("option")).toHaveCount(3);
   await expect(dokter).toContainText("Ayu Prameswari");
   await expect(dokter).toContainText("Bagas Nugroho");
+});
+
+/** Langkah 2 terisi lengkap menuju langkah 3, dengan pasien demo. */
+async function keLangkahTiga(page: Page) {
+  await keLangkahDua(page);
+  await page.getByLabel("Dokter penanggung jawab").selectOption({ label: "dr. Ayu Prameswari, Sp.PD" });
+  await page.getByLabel("Tanggal masuk").fill("2026-11-10");
+  await page.getByLabel("Diagnosa awal").fill("Observasi demam berdarah");
+  await denah(page).getByRole("radio", { name: /Melati I-2-A/ }).check();
+  await page.getByRole("button", { name: "Lanjut ke langkah 3" }).click();
+  await expect(page.getByRole("region", { name: "Ringkasan konfirmasi" })).toBeVisible();
+}
+
+// Regex berjangkar: wilayah live menyebut "Langkah 2 dari 3." di tengah kalimat.
+test("indikator langkah menyebut posisi dan jumlah langkah tersisa", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+  await expect(page.getByText(/^Langkah 1 dari 3/)).toBeVisible();
+  await expect(page.getByText("2 langkah lagi")).toBeVisible();
+
+  await keLangkahDua(page);
+  await expect(page.getByText(/^Langkah 2 dari 3/)).toBeVisible();
+  await expect(page.getByText("1 langkah lagi")).toBeVisible();
+
+  await page.getByRole("button", { name: "Kembali ke langkah 1" }).click();
+  await keLangkahTiga(page);
+  await expect(page.getByText(/^Langkah 3 dari 3/)).toBeVisible();
+  await expect(page.getByText("Langkah terakhir")).toBeVisible();
+});
+
+test("konfirmasi menampilkan pasien, Nomor Rekam Medis, dokter, kamar, bed, tarif, dan tanggal masuk", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+  await keLangkahTiga(page);
+
+  const ringkasan = page.getByRole("region", { name: "Ringkasan konfirmasi" });
+  await expect(ringkasan).toContainText("Bambang Sutrisno");
+  await expect(ringkasan).toContainText(/RM-\d{4}-\d+/);
+  await expect(ringkasan).toContainText("Ayu Prameswari");
+  await expect(ringkasan).toContainText("Melati I-2");
+  await expect(ringkasan).toContainText("Melati I-2-A");
+  await expect(ringkasan).toContainText("Rp600.000");
+  await expect(ringkasan).toContainText("10 November 2026");
+  await expect(ringkasan).toContainText("Observasi demam berdarah");
+});
+
+test("menyimpan admisi membuka bukti pendaftaran dan menambah daftar admisi aktif", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+
+  // Bambang sudah punya satu admisi aktif di data demo; setelah simpan harus dua.
+  const barisBambang = page.getByRole("region", { name: "Admisi aktif" }).getByRole("row", { name: /Bambang Sutrisno/ });
+  await expect(barisBambang).toHaveCount(1);
+
+  await keLangkahTiga(page);
+  await page.getByRole("button", { name: "Simpan admisi" }).click();
+
+  const bukti = page.getByRole("region", { name: "Bukti pendaftaran" });
+  await expect(bukti).toContainText("Bambang Sutrisno");
+  await expect(bukti).toContainText(/RM-\d{4}-\d+/);
+  await expect(bukti).toContainText("Ayu Prameswari");
+  await expect(bukti).toContainText("Melati I-2");
+  await expect(bukti).toContainText("Melati I-2-A");
+  await expect(bukti).toContainText("10 November 2026");
+  await expect(page.getByRole("button", { name: "Cetak bukti pendaftaran" })).toBeVisible();
+
+  // Admisi benar-benar tersimpan: daftar admisi aktif memuatnya setelah muat ulang.
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Admisi aktif" }).getByRole("row", { name: /Bambang Sutrisno/ })).toHaveCount(2);
+});
+
+test("bukti pendaftaran dapat dibuka lagi dari daftar admisi aktif", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+  await keLangkahTiga(page);
+  await page.getByRole("button", { name: "Simpan admisi" }).click();
+  await page.getByRole("button", { name: "Daftarkan pasien lain" }).click();
+
+  await page.getByRole("region", { name: "Admisi aktif" }).getByRole("button", { name: /Buka bukti pendaftaran Bambang Sutrisno/ }).first().click();
+
+  const bukti = page.getByRole("region", { name: "Bukti pendaftaran" });
+  await expect(bukti).toContainText("Bambang Sutrisno");
+  await expect(bukti).toContainText("Melati I-2-A");
+  await expect(bukti).toContainText(/RM-\d{4}-\d+/);
+});
+
+test("bed yang baru dialokasikan tidak lagi ditawarkan pada pendaftaran berikutnya", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+  await keLangkahTiga(page);
+  await page.getByRole("button", { name: "Simpan admisi" }).click();
+
+  await page.getByRole("button", { name: "Daftarkan pasien lain" }).click();
+  await page.getByLabel("Kata kunci pencarian").fill("Siti");
+  await pencarian(page).getByRole("button", { name: /Siti Rahmawati/ }).click();
+
+  await expect(denah(page).getByRole("radio", { name: /Melati I-2-A/ })).toBeDisabled();
+});
+
+// Jalur emas pertama (spec, E2E #1): pasien baru dari nol sampai punya bukti.
+test("jalur emas: pasien baru, dokter dan bed, konfirmasi, bukti pendaftaran", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+
+  await isiPasienBaru(page, { nama: "Rahmat Hidayat", nik: "3271012345670001" });
+  await page.getByRole("button", { name: "Simpan pasien" }).click();
+  await page.getByRole("button", { name: "Lanjut ke langkah 2" }).click();
+
+  const pilihDokter = page.getByLabel("Dokter penanggung jawab");
+  await pilihDokter.selectOption({ label: "dr. Ayu Prameswari, Sp.PD" });
+  await page.getByLabel("Tanggal masuk").fill("2026-11-12");
+  await page.getByLabel("Diagnosa awal").fill("Demam tiga hari");
+  await denah(page).getByRole("radio", { name: /Melati I-2-A/ }).check();
+  await page.getByRole("button", { name: "Lanjut ke langkah 3" }).click();
+
+  const ringkasan = page.getByRole("region", { name: "Ringkasan konfirmasi" });
+  await expect(ringkasan).toContainText("Rahmat Hidayat");
+  await page.getByRole("button", { name: "Simpan admisi" }).click();
+
+  const bukti = page.getByRole("region", { name: "Bukti pendaftaran" });
+  await expect(bukti).toContainText("Rahmat Hidayat");
+  await expect(bukti).toContainText(/RM-\d{4}-\d+/);
+  await expect(bukti).toContainText("Melati I-2-A");
+  await expect(page.getByRole("region", { name: "Admisi aktif" }).getByRole("row", { name: /Rahmat Hidayat/ })).toHaveCount(1);
 });

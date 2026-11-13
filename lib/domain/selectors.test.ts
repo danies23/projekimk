@@ -4,8 +4,10 @@ import {
   admisiAktif,
   alasanBedTidakTersedia,
   cariPasien,
+  daftarAdmisiAktif,
   denahBed,
   dokterAktif,
+  infoAdmisi,
   ringkasanBed,
 } from "./selectors";
 import { IDENTITAS_PASIEN, PENGGUNA_UJI, stateDasar, stateDenganAdmisi } from "./test-utils";
@@ -148,5 +150,63 @@ describe("selector admisi", () => {
   it("hanya mengembalikan admisi aktif", () => {
     const { store, admisiId } = stateDenganAdmisi();
     expect(admisiAktif(store.getState()).map((a) => a.id)).toEqual([admisiId]);
+  });
+
+  it("info admisi menggabungkan pasien, dokter, kamar, dan bed", () => {
+    const { store, admisiId } = stateDenganAdmisi();
+
+    const info = infoAdmisi(store.getState(), admisiId);
+
+    expect(info).toMatchObject({
+      pasien: { nama: IDENTITAS_PASIEN.nama, nomorRM: "RM-2026-1" },
+      dokter: { nama: "dr. Ayu" },
+      kamar: { nama: "Melati 1", kelas: "I", tarifHarian: 500_000 },
+      bed: { kode: "A" },
+      tanggalMasuk: "2026-03-01",
+    });
+  });
+
+  it("info admisi null untuk id yang tidak ada", () => {
+    const { store } = stateDenganAdmisi();
+    expect(infoAdmisi(store.getState(), "admisi-hantu")).toBeNull();
+  });
+
+  it("daftar admisi aktif memuat pasien, bed, dokter, dan tanggal masuk, terbaru dulu", () => {
+    const { store, admisiId } = stateDenganAdmisi();
+    const kedua = store.dispatch({
+      type: "pasien/dibuat",
+      olehId: PENGGUNA_UJI.pendaftaran,
+      input: { ...IDENTITAS_PASIEN, nama: "Pasien Baru", nik: "3201015501900099" },
+    });
+    if (!kedua.ok) throw new Error("setup gagal");
+    const masuk = store.dispatch({
+      type: "admisi/dibuat",
+      olehId: PENGGUNA_UJI.pendaftaran,
+      pasienId: kedua.id,
+      dokterId: PENGGUNA_UJI.dokter,
+      bedId: "bed-2",
+      tanggalMasuk: "2026-02-25",
+      diagnosaAwal: "Observasi",
+    });
+    if (!masuk.ok) throw new Error("setup gagal");
+
+    const daftar = daftarAdmisiAktif(store.getState());
+
+    expect(daftar.map((a) => a.admisiId)).toEqual([admisiId, masuk.id]);
+    expect(daftar[1]).toMatchObject({
+      pasien: { nama: "Pasien Baru" },
+      bed: { kode: "B" },
+      dokter: { nama: "dr. Ayu" },
+      tanggalMasuk: "2026-02-25",
+    });
+  });
+
+  it("daftar admisi aktif tidak memuat admisi selesai", () => {
+    const { store, admisiId } = stateDenganAdmisi();
+    const tagihan = store.getState().tagihan.find((t) => t.admisiId === admisiId)!;
+    store.dispatch({ type: "pembayaran/dicatat", olehId: PENGGUNA_UJI.kasir, tagihanId: tagihan.id, jumlah: 9_000_000, metode: "tunai" });
+    store.dispatch({ type: "checkout", olehId: PENGGUNA_UJI.kasir, admisiId, override: null });
+
+    expect(daftarAdmisiAktif(store.getState())).toEqual([]);
   });
 });

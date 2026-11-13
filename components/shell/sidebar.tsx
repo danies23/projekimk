@@ -13,7 +13,7 @@ export function Sidebar() {
   const menu = menuUntuk(pengguna?.peran);
 
   return (
-    <nav aria-label="Navigasi utama" className="border-b border-border bg-surface lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r">
+    <nav aria-label="Navigasi utama" className="border-b border-border bg-surface no-print lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r">
       <ul className="flex gap-1 overflow-x-auto px-3 py-2 lg:flex-col lg:py-4">
         {menu.map((m) => {
           const aktif = ruteDiModul(pathname, m.href);

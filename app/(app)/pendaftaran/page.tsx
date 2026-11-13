@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Wordmark } from "@/components/brand/wordmark";
 import { useSesi } from "@/components/shell/sesi-provider";
 import { useHariIni, useSelector, useStoreDemo } from "@/components/shell/store-provider";
 import type { InputPasien } from "@/lib/domain/actions";
 import {
   alasanBedTidakTersedia,
   cariPasien,
+  daftarAdmisiAktif,
   denahBed,
   dokterAktif,
+  infoAdmisi,
   pasienDenganNik,
   penggunaById,
   pilihPasienById,
   ringkasanBed,
+  type InfoAdmisi,
   type RingkasanBed,
 } from "@/lib/domain/selectors";
 import type { Pasien, StatusBed } from "@/lib/domain/types";
@@ -113,14 +117,26 @@ export default function HalamanPendaftaran() {
   const [diagnosaAwal, setDiagnosaAwal] = useState("");
   const [bedId, setBedId] = useState("");
   const [galatLangkah2, setGalatLangkah2] = useState<{ dokter?: string; bed?: string }>({});
+  const [galatAdmisi, setGalatAdmisi] = useState<string | null>(null);
+  const [admisiTersimpan, setAdmisiTersimpan] = useState<string | null>(null);
+  const [buktiDibuka, setBuktiDibuka] = useState<string | null>(null);
   const judulLangkah = useRef<HTMLHeadingElement>(null);
+  const judulAwal = useRef<HTMLHeadingElement>(null);
+  // Ditulis oleh tombol "Daftarkan pasien lain" sebelum kembali ke langkah 1.
+  const keLangkah1 = useRef(false);
   const namaPasien = useRef<HTMLInputElement>(null);
 
-  // Perpindahan langkah mengganti seluruh isi halaman; tanpa memindahkan fokus
-  // ke judul langkah, pengguna keyboard kembali ke awal dokumen (WCAG 2.4.3).
+  // Perpindahan langkah dan bukti pendaftaran mengganti seluruh isi halaman;
+  // tanpa memindahkan fokus ke judul, pengguna keyboard kembali ke awal dokumen
+  // (WCAG 2.4.3) atau tertinggal di tombol yang sudah tidak ada.
   useEffect(() => {
-    if (langkah > 1) judulLangkah.current?.focus();
-  }, [langkah]);
+    if (admisiTersimpan || buktiDibuka || langkah > 1) {
+      judulLangkah.current?.focus();
+    } else if (keLangkah1.current) {
+      judulAwal.current?.focus();
+      keLangkah1.current = false;
+    }
+  }, [langkah, admisiTersimpan, buktiDibuka]);
 
   if (!pengguna) return null;
 
@@ -133,7 +149,8 @@ export default function HalamanPendaftaran() {
   const denah = denahBed(state);
   const ringkasan = ringkasanBed(state);
   // Pilihan bed bisa basi: bed diambil admisi lain, atau kamarnya dinonaktifkan.
-  const bedTerpilih = denah.flatMap((k) => k.bed).find((b) => b.id === bedId);
+  const kamarTerpilih = denah.find((k) => k.bed.some((b) => b.id === bedId));
+  const bedTerpilih = kamarTerpilih?.bed.find((b) => b.id === bedId);
   const alasanBedBasi = bedId
     ? bedTerpilih
       ? alasanBedTidakTersedia(state, bedId)
@@ -181,7 +198,65 @@ export default function HalamanPendaftaran() {
     };
     setGalatLangkah2(salah);
     if (salah.dokter || salah.bed || alasanBedBasi) return;
+    // Pesan gagal simpan sebelumnya tidak boleh menghantui kunjungan berikutnya.
+    setGalatAdmisi(null);
     setLangkah(3);
+  }
+
+  function simpanAdmisi() {
+    setGalatAdmisi(null);
+    if (!pasien) {
+      setGalatAdmisi("Pasien belum dipilih. Kembali ke langkah 1.");
+      return;
+    }
+    const hasil = store.dispatch({
+      type: "admisi/dibuat",
+      olehId: pengguna!.id,
+      pasienId: pasien.id,
+      dokterId,
+      bedId,
+      tanggalMasuk,
+      diagnosaAwal: diagnosaAwal.trim(),
+    });
+    if (!hasil.ok) {
+      setGalatAdmisi(hasil.alasan);
+      return;
+    }
+    setAdmisiTersimpan(hasil.id);
+  }
+
+  // Sumber bukti: admisi yang baru disimpan, atau bukti lama yang dibuka lagi
+  // dari daftar admisi aktif. Bukti bisa dibuka ulang setelah muat ulang.
+  const buktiId = admisiTersimpan ?? buktiDibuka;
+  if (buktiId) {
+    return (
+      <div>
+        <BuktiPendaftaran
+          info={infoAdmisi(state, buktiId)}
+          judulRef={judulLangkah}
+          onDaftarLagi={() => {
+            keLangkah1.current = true;
+            setAdmisiTersimpan(null);
+            setBuktiDibuka(null);
+            setPasien(null);
+            setBaruDisimpan(false);
+            setIsian(ISIAN_AWAL);
+            setKataKunci("");
+            setDokterId("");
+            setTanggalMasuk(hariIni);
+            setDiagnosaAwal("");
+            setBedId("");
+            setGalat({});
+            setGalatLangkah2({});
+            setGalatSimpan(null);
+            setGalatAdmisi(null);
+            setPengumuman("");
+            setLangkah(1);
+          }}
+        />
+        <DaftarAdmisiAktif baris={daftarAdmisiAktif(state)} onBukaBukti={setBuktiDibuka} />
+      </div>
+    );
   }
 
   if (langkah === 3) {
@@ -195,27 +270,38 @@ export default function HalamanPendaftaran() {
           <h2 ref={judulLangkah} tabIndex={-1} className="text-title">
             Konfirmasi pendaftaran
           </h2>
+          <p className="mt-2 text-small text-text-muted">
+            Periksa kembali isian berikut. Admisi baru dibuat setelah petugas menekan Simpan admisi.
+          </p>
           <dl className="mt-4 grid gap-2 text-body">
             <BarisRingkas label="Pasien" nilai={`${pasien?.nama ?? ""} (${pasien?.nomorRM ?? ""})`} />
+            <BarisRingkas label="NIK" nilai={pasien?.nik ?? ""} />
+            <BarisRingkas label="Dokter penanggung jawab" nilai={penggunaById(state, dokterId)?.nama ?? ""} />
+            <BarisRingkas label="Kamar" nilai={kamarTerpilih?.nama ?? ""} />
             <BarisRingkas
-              label="Dokter"
-              nilai={penggunaById(state, dokterId)?.nama ?? ""}
+              label="Bed"
+              nilai={`${bedTerpilih?.kode ?? ""} (${kamarTerpilih?.kelas ?? ""})`}
             />
-            <BarisRingkas label="Bed" nilai={denah.flatMap((k) => k.bed).find((b) => b.id === bedId)?.kode ?? ""} />
+            <BarisRingkas
+              label="Tarif harian"
+              nilai={kamarTerpilih ? `${formatRupiah(kamarTerpilih.tarifHarian)}/hari` : ""}
+            />
             <BarisRingkas label="Tanggal masuk" nilai={formatTanggal(tanggalMasuk)} />
-            <BarisRingkas label="Diagnosa awal" nilai={diagnosaAwal || "—"} />
+            <BarisRingkas label="Diagnosa awal" nilai={diagnosaAwal.trim() || "—"} />
           </dl>
-          <p className="mt-4 border-t border-border pt-4 text-small text-text-muted">
-            Ringkasan konfirmasi, penyimpanan admisi, dan bukti pendaftaran diselesaikan pada ticket
-            berikutnya.
-          </p>
-          <button
-            type="button"
-            onClick={() => setLangkah(2)}
-            className="mt-5 inline-flex min-h-11 items-center rounded-md border border-border bg-surface px-4 text-small font-semibold text-text transition-colors hover:bg-surface-muted"
-          >
-            Kembali ke langkah 2
-          </button>
+          {galatAdmisi ? (
+            <p role="alert" className="mt-4 rounded-md border border-danger px-3 py-2 text-small text-danger">
+              {galatAdmisi}
+            </p>
+          ) : null}
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button type="button" onClick={() => setLangkah(2)} className={tombolSekunder}>
+              Kembali ke langkah 2
+            </button>
+            <button type="button" onClick={simpanAdmisi} className={tombolUtama}>
+              Simpan admisi
+            </button>
+          </div>
         </section>
       </div>
     );
@@ -390,7 +476,7 @@ export default function HalamanPendaftaran() {
 
   return (
     <div>
-      <KepalaWizard langkah={1} pengumuman={pengumuman} />
+      <KepalaWizard langkah={1} pengumuman={pengumuman} judulRef={judulAwal} />
       <p className="mt-2 max-w-prose text-body text-text-muted">
         Cari pasien lama lebih dulu agar tidak ada rekam medis ganda. Bila belum pernah terdaftar, buat
         pasien baru di bawah.
@@ -596,6 +682,8 @@ export default function HalamanPendaftaran() {
           </form>
         </section>
       </div>
+
+      <DaftarAdmisiAktif baris={daftarAdmisiAktif(state)} onBukaBukti={setBuktiDibuka} />
     </div>
   );
 }
@@ -656,12 +744,26 @@ function PesanGalat({ id, pesan }: { id: string; pesan?: string }) {
 }
 
 /** Judul halaman dan posisi langkah; wilayah live ikut di sini agar tidak hanya ada di langkah 1. */
-function KepalaWizard({ langkah, pengumuman }: { langkah: 1 | 2 | 3; pengumuman: string }) {
+/** Judul halaman dan posisi langkah; wilayah live ikut di sini agar tidak hanya ada di langkah 1. */
+function KepalaWizard({
+  langkah,
+  pengumuman,
+  judulRef,
+}: {
+  langkah: 1 | 2 | 3;
+  pengumuman: string;
+  judulRef?: React.Ref<HTMLHeadingElement>;
+}) {
+  const sisa = 3 - langkah;
   return (
     <>
-      <h1 className="text-heading">Pendaftaran pasien</h1>
+      <h1 ref={judulRef} tabIndex={judulRef ? -1 : undefined} className="text-heading">
+        Pendaftaran pasien
+      </h1>
       <p className="mt-2 text-caption font-semibold uppercase tracking-wide text-text-muted">
         Langkah {langkah} dari 3
+        <span className="mx-1.5" aria-hidden="true">·</span>
+        {sisa === 0 ? "Langkah terakhir" : `${sisa} langkah lagi`}
       </p>
       <p role="status" className="sr-only">
         {pengumuman}
@@ -716,6 +818,154 @@ function RecordKetersediaan({ ringkasan }: { ringkasan: RingkasanBed }) {
       <p className="mt-2 text-caption text-text-muted">
         Jumlah bed dihitung dari kamar aktif (termasuk bed yang sedang dibersihkan).
       </p>
+    </section>
+  );
+}
+
+/** Pratinjau cetak bukti pendaftaran; tombol Cetak memanggil dialog cetak peramban. */
+function BuktiPendaftaran({
+  info,
+  judulRef,
+  onDaftarLagi,
+}: {
+  info: InfoAdmisi | null;
+  judulRef: React.Ref<HTMLHeadingElement>;
+  onDaftarLagi: () => void;
+}) {
+  if (!info) {
+    return (
+      <section aria-label="Bukti pendaftaran" className="max-w-prose rounded-lg border border-border bg-surface p-6 shadow-sm">
+        <h1 ref={judulRef} tabIndex={-1} className="text-title">
+          Bukti pendaftaran tidak ditemukan
+        </h1>
+        <p className="mt-2 text-small text-text-muted">
+          Data admisi tidak lagi tersedia, mungkin karena data demo direset. Mulai pendaftaran baru.
+        </p>
+        <button type="button" onClick={onDaftarLagi} className={tombolUtama}>
+          Daftarkan pasien lain
+        </button>
+      </section>
+    );
+  }
+
+  const { pasien, dokter, kamar, bed, tanggalMasuk, diagnosaAwal } = info;
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-3 no-print">
+        <button type="button" onClick={() => window.print()} className={tombolUtama}>
+          Cetak bukti pendaftaran
+        </button>
+        <button type="button" onClick={onDaftarLagi} className={tombolSekunder}>
+          Daftarkan pasien lain
+        </button>
+      </div>
+      <p role="status" className="sr-only">
+        Admisi tersimpan. Bukti pendaftaran siap dicetak.
+      </p>
+
+      <section
+        aria-label="Bukti pendaftaran"
+        className="mt-6 max-w-prose rounded-lg border border-border bg-surface p-8 shadow-sm print:max-w-none print:border-0 print:shadow-none"
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-border pb-4">
+          <Wordmark />
+          <div className="text-right text-caption text-text-muted">
+            <p className="font-semibold uppercase tracking-wide text-text">Bukti Pendaftaran</p>
+            <p>Rawat Inap</p>
+          </div>
+        </header>
+
+        <h1 ref={judulRef} tabIndex={-1} className="mt-6 text-title">
+          Bukti pendaftaran {pasien.nama}
+        </h1>
+        <dl className="mt-4 grid gap-2 text-body">
+          <BarisRingkas label="Nama pasien" nilai={pasien.nama} />
+          <BarisRingkas label="Nomor Rekam Medis" nilai={pasien.nomorRM} />
+          <BarisRingkas label="NIK" nilai={pasien.nik} />
+          <BarisRingkas
+            label="Jenis kelamin"
+            nilai={`${pasien.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"}, lahir ${formatTanggal(pasien.tanggalLahir)}`}
+          />
+          <BarisRingkas label="Alamat" nilai={pasien.alamat} />
+          <BarisRingkas label="Dokter penanggung jawab" nilai={dokter.nama} />
+          <BarisRingkas label="Kamar" nilai={`${kamar.nama} (kelas ${kamar.kelas})`} />
+          <BarisRingkas label="Bed" nilai={bed.kode} />
+          <BarisRingkas label="Tarif harian" nilai={`${formatRupiah(kamar.tarifHarian)}/hari`} />
+          <BarisRingkas label="Tanggal masuk" nilai={formatTanggal(tanggalMasuk)} />
+          <BarisRingkas label="Diagnosa awal" nilai={diagnosaAwal || "—"} />
+          <BarisRingkas label="Penanggung jawab" nilai={`${pasien.penanggungJawab.nama} (${pasien.penanggungJawab.hubungan}) — ${pasien.penanggungJawab.telepon}`} />
+        </dl>
+
+        <p className="mt-6 border-t border-border pt-4 text-caption text-text-muted">
+          Bawa bukti ini selama menjalani rawat inap. Nomor Rekam Medis dipakai untuk seluruh layanan
+          Dani Medical Center.
+        </p>
+      </section>
+    </div>
+  );
+}
+
+const tombolUtama =
+  "inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-small font-semibold text-on-primary transition-colors hover:bg-primary-hover";
+const tombolSekunder =
+  "inline-flex min-h-11 items-center rounded-md border border-border bg-surface px-4 text-small font-semibold text-text transition-colors hover:bg-surface-muted";
+
+/** Daftar admisi aktif: jawaban cepat "pasien ini dirawat di mana", dan pintu ke bukti pendaftaran. */
+function DaftarAdmisiAktif({ baris, onBukaBukti }: { baris: InfoAdmisi[]; onBukaBukti: (admisiId: string) => void }) {
+  return (
+    <section aria-label="Admisi aktif" className="mt-10 no-print">
+      <h2 className="text-title">Admisi aktif</h2>
+      <p className="mt-1 text-small text-text-muted">
+        {formatAngka(baris.length, "jumlah")} pasien sedang dirawat. Daftar diperbarui otomatis setelah
+        admisi baru dibuat.
+      </p>
+      {baris.length === 0 ? (
+        <p className="mt-4 rounded-md border border-border bg-surface-muted p-4 text-small text-text-muted">
+          Belum ada pasien yang sedang dirawat. Selesaikan pendaftaran untuk mengisi daftar ini.
+        </p>
+      ) : (
+        <div className="mt-4 overflow-x-auto rounded-lg border border-border bg-surface shadow-sm">
+          <table className="w-full text-small">
+            <caption className="sr-only">Pasien yang sedang dirawat</caption>
+            <thead>
+              <tr className="border-b border-border text-left">
+                <th scope="col" className="px-4 py-3 font-semibold">Pasien</th>
+                <th scope="col" className="px-4 py-3 font-semibold">Bed</th>
+                <th scope="col" className="px-4 py-3 font-semibold">Dokter</th>
+                <th scope="col" className="px-4 py-3 font-semibold">Tanggal masuk</th>
+                <th scope="col" className="px-4 py-3 font-semibold">
+                  <span className="sr-only">Bukti pendaftaran</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {baris.map((b) => (
+                <tr key={b.admisiId} className="border-b border-border last:border-b-0">
+                  <th scope="row" className="px-4 py-3 text-left font-medium text-text">
+                    {b.pasien.nama}
+                    <span className="ml-1.5 font-normal text-text-muted">{b.pasien.nomorRM}</span>
+                  </th>
+                  <td className="px-4 py-3 text-text">
+                    {b.bed.kode}
+                    <span className="ml-1.5 text-text-muted">{b.kamar.nama}</span>
+                  </td>
+                  <td className="px-4 py-3 text-text">{b.dokter.nama}</td>
+                  <td className="px-4 py-3 text-text">{formatTanggal(b.tanggalMasuk)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onBukaBukti(b.admisiId)}
+                      className="inline-flex min-h-11 items-center rounded-md px-2 text-small font-semibold text-primary hover:underline"
+                    >
+                      Buka bukti<span className="sr-only"> pendaftaran {b.pasien.nama}</span>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

@@ -11,7 +11,7 @@ export function JejakNavigasi() {
   if (jejak.length === 0) return null;
 
   return (
-    <nav aria-label="Jejak navigasi" className="text-small text-text-muted">
+    <nav aria-label="Jejak navigasi" className="text-small text-text-muted no-print">
       <ol className="flex flex-wrap items-center gap-1.5">
         {jejak.map((modul, index) => {
           const terakhir = index === jejak.length - 1;
