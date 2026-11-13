@@ -378,6 +378,8 @@ const penggunaDibuat: Handler<Extract<Action, { type: "pengguna/dibuat" }>> = (d
 const catatanDitulis: Handler<Extract<Action, { type: "catatan/ditulis" }>> = (draft, action, deps) => {
   const admisi = draft.admisi.find((a) => a.id === action.admisiId);
   if (!admisi) return { ok: false, alasan: "Admisi tidak ditemukan." };
+  // Catatan setelah pulang akan menempel pada rekam medis yang sudah ditutup.
+  if (admisi.status !== "aktif") return { ok: false, alasan: "Admisi ini sudah selesai." };
   if (!action.isi.trim()) return { ok: false, alasan: "Isi catatan tidak boleh kosong." };
 
   const catatan = {
@@ -443,7 +445,11 @@ const resepDibuat: Handler<Extract<Action, { type: "resep/dibuat" }>> = (draft, 
     if (!bulatPositif(item.jumlah)) {
       return { ok: false, alasan: `Jumlah ${obat.nama} harus bilangan bulat lebih dari nol.` };
     }
-    items.push({ obatId: obat.id, nama: obat.nama, jumlah: item.jumlah, aturanPakai: item.aturanPakai, harga: obat.harga });
+    // Farmasi butuh aturan pakai untuk menyiapkan obat; resep tanpa itu tidak berguna.
+    if (!item.aturanPakai.trim()) {
+      return { ok: false, alasan: `Aturan pakai ${obat.nama} wajib diisi.` };
+    }
+    items.push({ obatId: obat.id, nama: obat.nama, jumlah: item.jumlah, aturanPakai: item.aturanPakai.trim(), harga: obat.harga });
   }
 
   const resep = {

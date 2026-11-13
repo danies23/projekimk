@@ -186,4 +186,36 @@ describe("admisi selesai tidak menerima biaya baru", () => {
     expect(hasil).toEqual({ ok: false, alasan: "Admisi ini sudah selesai." });
     expect(store.getState().resep).toHaveLength(0);
   });
+
+  it("menolak catatan baru pada admisi selesai", () => {
+    const { store, admisiId } = admisiSelesai();
+
+    const hasil = store.dispatch({
+      type: "catatan/ditulis",
+      olehId: PENGGUNA_UJI.dokter,
+      admisiId,
+      jenis: "visite",
+      isi: "Catatan setelah pulang.",
+      diagnosa: null,
+      rencana: null,
+      tandaVital: null,
+    });
+
+    expect(hasil).toEqual({ ok: false, alasan: "Admisi ini sudah selesai." });
+    expect(store.getState().catatanKlinis.some((c) => c.isi === "Catatan setelah pulang.")).toBe(false);
+  });
+
+  it("menolak resep tanpa aturan pakai", () => {
+    const { store, admisiId } = denganAdmisi();
+
+    const hasil = store.dispatch({
+      type: "resep/dibuat",
+      olehId: PENGGUNA_UJI.dokter,
+      admisiId,
+      items: [{ obatId: "obat-1", jumlah: 1, aturanPakai: "  " }],
+    });
+
+    expect(hasil).toEqual({ ok: false, alasan: expect.stringContaining("Aturan pakai") });
+    expect(store.getState().resep).toHaveLength(0);
+  });
 });

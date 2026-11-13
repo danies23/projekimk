@@ -36,7 +36,7 @@ test("dokter melihat pasien tanggung jawabnya dan konteks admisi sebelum menulis
   await expect(konteks).toContainText("Diagnosa awal");
 });
 
-test("visite, tindakan, dan resep langsung tercatat pada riwayat dan tagihan", async ({ page }) => {
+test("visite, tindakan, dan resep langsung tercatat pada riwayat", async ({ page }) => {
   await bukaKlinis(page);
   await pilihPasien(page, "Siti Rahmawati");
 

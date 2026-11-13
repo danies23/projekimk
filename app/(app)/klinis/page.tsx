@@ -116,6 +116,9 @@ export default function HalamanKlinis() {
         {admisiId ? (
           info && admisi ? (
             <DetailAdmisi
+              // Kunci per admisi: draf visite atau baris resep pasien A tidak
+              // boleh terbawa saat dokter memilih pasien B.
+              key={admisi.id}
               info={info}
               sudahSelesai={admisi.status === "selesai"}
               penggunaId={pengguna.id}
@@ -477,12 +480,9 @@ function BagianResep({
   const resepAdmisi = state.resep.filter((r) => r.admisiId === admisiId);
 
   function tambahBaris() {
+    // Pesan penolakan milik store; di sini hanya dicegah menambah baris kosong.
     if (!obatId) {
       setGalatBaris("Pilih obat terlebih dahulu.");
-      return;
-    }
-    if (!Number.isInteger(Number(jumlah)) || Number(jumlah) <= 0) {
-      setGalatBaris("Jumlah harus bilangan bulat lebih dari nol.");
       return;
     }
     if (!aturanPakai.trim()) {
@@ -596,7 +596,7 @@ function BagianResep({
                   <button
                     type="button"
                     onClick={() => setBaris((lama) => lama.filter((x) => x.kunci !== b.kunci))}
-                    className="rounded-md px-2 py-1 text-caption font-semibold text-danger hover:underline"
+                    className={tombolBahayaKecil}
                   >
                     Batalkan baris<span className="sr-only"> {obat?.nama}</span>
                   </button>
@@ -862,3 +862,5 @@ const tombolSekunder =
   "inline-flex min-h-11 items-center rounded-md border border-border bg-surface px-4 text-small font-semibold text-text transition-colors hover:bg-surface-muted";
 const tombolSekunderKecil =
   "inline-flex min-h-11 items-center rounded-md px-2 text-small font-semibold text-primary hover:underline";
+const tombolBahayaKecil =
+  "inline-flex min-h-11 items-center rounded-md px-2 text-small font-semibold text-danger hover:underline";
