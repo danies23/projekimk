@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { masukSebagai } from "./bantuan";
 
 /**
- * Langkah 1 wizard pendaftaran: mencari pasien lama atau membuat pasien baru.
+ * Wizard pendaftaran: langkah 1 mencari pasien lama atau membuat pasien baru,
+ * langkah 2 memilih dokter, tanggal masuk, diagnosa awal, dan bed.
  * Setiap test memakai konteks peramban baru, sehingga data demo ditanam ulang
  * dan Nomor Rekam Medis yang dibuat test tidak bergantung pada urutan.
  */
@@ -129,4 +130,103 @@ test("form pasien baru menampilkan pesan di dekat kolom yang salah", async ({ pa
   const nama = page.getByLabel("Nama pasien");
   await expect(nama).toHaveAttribute("aria-invalid", "true");
   await expect(page.getByRole("region", { name: "Pasien baru" })).toContainText("Nama pasien wajib diisi");
+});
+
+/** Langkah 2 dengan pasien demo yang sudah terdaftar. */
+async function keLangkahDua(page: Page) {
+  await page.getByLabel("Kata kunci pencarian").fill("Bambang");
+  await pencarian(page).getByRole("button", { name: /Bambang Sutrisno/ }).click();
+  await expect(page.getByRole("region", { name: "Dokter dan bed" })).toBeVisible();
+}
+
+function denah(page: Page) {
+  return page.getByRole("region", { name: "Denah bed" });
+}
+
+function ringkasanBed(page: Page) {
+  return page.getByRole("region", { name: "Ringkasan ketersediaan bed" });
+}
+
+test("langkah 2 menampilkan denah bed per kamar dengan kelas, tarif, dan status teks", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+  await keLangkahDua(page);
+
+  const anggrek = denah(page).getByRole("group", { name: /Anggrek VIP-1/ });
+  await expect(anggrek).toContainText("Kelas VIP");
+  await expect(anggrek).toContainText("Rp900.000");
+  await expect(anggrek.getByText("terisi", { exact: true }).first()).toBeVisible();
+
+  // Status dibedakan dengan teks, bukan hanya warna (WCAG 1.4.1).
+  await expect(denah(page).getByRole("listitem").filter({ hasText: "Mawar II-1-C" })).toContainText("dibersihkan");
+  await expect(denah(page).getByRole("listitem").filter({ hasText: "Melati I-2-A" })).toContainText("kosong");
+});
+
+test("tabel ringkasan menampilkan jumlah bed per status dan BOR terkini", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+  await keLangkahDua(page);
+
+  const ringkasan = ringkasanBed(page);
+  await expect(ringkasan).toContainText("Terisi");
+  await expect(ringkasan.getByRole("row", { name: /Terisi/ })).toContainText("10");
+  await expect(ringkasan.getByRole("row", { name: /Kosong/ })).toContainText("4");
+  await expect(ringkasan.getByRole("row", { name: /Dibersihkan/ })).toContainText("2");
+  await expect(ringkasan).toContainText("62,5%");
+});
+
+test("hanya bed kosong yang dapat dipilih", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+  await keLangkahDua(page);
+
+  await expect(denah(page).getByRole("radio", { name: /Anggrek VIP-1-A/ })).toBeDisabled();
+  await expect(denah(page).getByRole("radio", { name: /Mawar II-1-C/ })).toBeDisabled();
+  await expect(denah(page).getByRole("radio", { name: /Melati I-2-A/ })).toBeEnabled();
+});
+
+test("pilihan dokter, tanggal, diagnosa, dan bed bertahan saat bergerak antar langkah", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+  await keLangkahDua(page);
+
+  const dokter = page.getByLabel("Dokter penanggung jawab");
+  const opsiDokter = await dokter.locator("option").nth(2).getAttribute("value");
+  await dokter.selectOption(opsiDokter!);
+  await page.getByLabel("Tanggal masuk").fill("2026-11-10");
+  await page.getByLabel("Diagnosa awal").fill("Observasi demam berdarah");
+  await denah(page).getByRole("radio", { name: /Melati I-2-A/ }).check();
+  await page.getByRole("button", { name: "Lanjut ke langkah 3" }).click();
+
+  await page.getByRole("button", { name: "Kembali ke langkah 2" }).click();
+  await expect(page.getByLabel("Dokter penanggung jawab")).toHaveValue(opsiDokter!);
+  await expect(page.getByLabel("Tanggal masuk")).toHaveValue("2026-11-10");
+  await expect(page.getByLabel("Diagnosa awal")).toHaveValue("Observasi demam berdarah");
+  await expect(denah(page).getByRole("radio", { name: /Melati I-2-A/ })).toBeChecked();
+
+  await page.getByRole("button", { name: "Kembali ke langkah 1" }).click();
+  await pencarian(page).getByRole("button", { name: /Bambang Sutrisno/ }).click();
+
+  await expect(page.getByLabel("Dokter penanggung jawab")).toHaveValue(opsiDokter!);
+  await expect(page.getByLabel("Tanggal masuk")).toHaveValue("2026-11-10");
+  await expect(page.getByLabel("Diagnosa awal")).toHaveValue("Observasi demam berdarah");
+  await expect(denah(page).getByRole("radio", { name: /Melati I-2-A/ })).toBeChecked();
+});
+
+test("langkah 2 menolak lanjut tanpa dokter dan bed, dengan pesan di dekat kolomnya", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+  await keLangkahDua(page);
+
+  await page.getByRole("button", { name: "Lanjut ke langkah 3" }).click();
+
+  await expect(page.getByLabel("Dokter penanggung jawab")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByRole("region", { name: "Dokter dan bed" })).toContainText("Pilih dokter penanggung jawab");
+  await expect(page.getByRole("region", { name: "Dokter dan bed" })).toContainText("Pilih satu bed kosong");
+  await expect(page.getByRole("region", { name: "Ringkasan konfirmasi" })).toHaveCount(0);
+});
+
+test("daftar dokter hanya memuat dokter yang aktif", async ({ page }) => {
+  await masukSebagaiPendaftaran(page);
+  await keLangkahDua(page);
+
+  const dokter = page.getByLabel("Dokter penanggung jawab");
+  await expect(dokter.getByRole("option")).toHaveCount(3);
+  await expect(dokter).toContainText("Ayu Prameswari");
+  await expect(dokter).toContainText("Bagas Nugroho");
 });

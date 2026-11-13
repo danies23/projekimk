@@ -2,7 +2,7 @@ import type { Action, Store, StoreDeps } from "./actions";
 import { cloneState } from "./state";
 import { audit } from "./audit";
 import { IZIN_AKSI, boleh } from "./izin";
-import { pasienDenganNik } from "./selectors";
+import { alasanBedTidakTersedia, pasienDenganNik } from "./selectors";
 import { nilaiTagihan } from "./tagihan";
 import type { Admisi, Bed, Hasil, Pasien, State } from "./types";
 
@@ -34,19 +34,12 @@ function bed(state: State, bedId: string): Bed | undefined {
 }
 
 /**
- * Satu bed hanya boleh menempati satu admisi aktif. Pesan sengaja menyebut
- * "baru saja terisi" karena dari sudut pandang petugas, begitulah kejadiannya.
+ * Satu bed hanya boleh menempati satu admisi aktif. Pesan penolakan hidup di
+ * selector agar pemilih bed menampilkan kalimat yang persis sama.
  */
 function bedTersedia(state: State, bedId: string): { ok: true } | { ok: false; alasan: string } {
-  const target = bed(state, bedId);
-  if (!target) return { ok: false, alasan: "Bed tidak ditemukan." };
-  if (target.status === "terisi") {
-    return { ok: false, alasan: `Bed ${target.kode} baru saja terisi, pilih bed lain.` };
-  }
-  if (target.status === "dibersihkan") {
-    return { ok: false, alasan: `Bed ${target.kode} belum siap dipakai. Tunggu sampai dibersihkan.` };
-  }
-  return { ok: true };
+  const alasan = alasanBedTidakTersedia(state, bedId);
+  return alasan ? { ok: false, alasan } : { ok: true };
 }
 
 const pasienDibuat: Handler<Extract<Action, { type: "pasien/dibuat" }>> = (draft, action, deps) => {

@@ -1,4 +1,4 @@
-import type { Admisi, Id, Pasien, State } from "./types";
+import type { Admisi, Bed, Id, Kamar, KelasKamar, Pasien, Pengguna, State } from "./types";
 
 export function pilihPasienById(state: State, id: Id): Pasien | undefined {
   return state.pasien.find((p) => p.id === id);
@@ -47,8 +47,11 @@ export interface RingkasanBed {
 }
 
 export function ringkasanBed(state: State): RingkasanBed {
-  const total = state.bed.length;
-  const hitung = (status: string) => state.bed.filter((b) => b.status === status).length;
+  // Kamar nonaktif tidak ditawarkan ke petugas, jadi bed-nya tidak dihitung BOR.
+  const kamarAktif = new Set(state.kamar.filter((k) => k.aktif).map((k) => k.id));
+  const bed = state.bed.filter((b) => kamarAktif.has(b.kamarId));
+  const total = bed.length;
+  const hitung = (status: string) => bed.filter((b) => b.status === status).length;
   const terisi = hitung("terisi");
   return {
     total,
@@ -61,6 +64,46 @@ export function ringkasanBed(state: State): RingkasanBed {
 
 export function penggunaById(state: State, id: Id) {
   return state.pengguna.find((p) => p.id === id);
+}
+
+/** Dokter yang bisa dipilih sebagai penanggung jawab admisi baru. */
+export function dokterAktif(state: State): Pengguna[] {
+  return state.pengguna.filter((p) => p.peran === "dokter" && p.aktif);
+}
+
+export interface BedKamar {
+  id: Id;
+  nama: string;
+  kelas: KelasKamar;
+  tarifHarian: number;
+  bed: Bed[];
+}
+
+/** Denah bed: kamar aktif beserta bed-nya, urut sesuai urutan kamar di master. */
+export function denahBed(state: State): BedKamar[] {
+  return state.kamar
+    .filter((k) => k.aktif)
+    .map((k: Kamar) => ({
+      id: k.id,
+      nama: k.nama,
+      kelas: k.kelas,
+      tarifHarian: k.tarifHarian,
+      bed: state.bed.filter((b) => b.kamarId === k.id),
+    }));
+}
+
+/**
+ * Pesan penolakan bed kosong; `null` berarti bed dapat dipilih. Dipakai
+ * pemilih bed dan store supaya pesan "baru saja terisi" tidak ditulis dua kali.
+ */
+export function alasanBedTidakTersedia(state: State, bedId: Id): string | null {
+  const target = state.bed.find((b) => b.id === bedId);
+  if (!target) return "Bed tidak ditemukan.";
+  if (target.status === "terisi") return `Bed ${target.kode} baru saja terisi, pilih bed lain.`;
+  if (target.status === "dibersihkan") {
+    return `Bed ${target.kode} belum siap dipakai. Tunggu sampai perawat menandainya siap.`;
+  }
+  return null;
 }
 
 export function tagihanUntukAdmisi(state: State, admisiId: Id) {

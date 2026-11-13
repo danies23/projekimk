@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { buatDataDemo } from "./data-demo";
-import { admisiAktif, cariPasien, ringkasanBed } from "./selectors";
-import { IDENTITAS_PASIEN, PENGGUNA_UJI, stateDenganAdmisi } from "./test-utils";
+import {
+  admisiAktif,
+  alasanBedTidakTersedia,
+  cariPasien,
+  denahBed,
+  dokterAktif,
+  ringkasanBed,
+} from "./selectors";
+import { IDENTITAS_PASIEN, PENGGUNA_UJI, stateDasar, stateDenganAdmisi } from "./test-utils";
 
 describe("selector pasien", () => {
   it("mencari pasien berdasarkan nama tanpa membedakan huruf besar-kecil", () => {
@@ -47,6 +54,93 @@ describe("selector bed", () => {
   it("BOR bernilai nol ketika belum ada bed, bukan NaN", () => {
     const kosong = { ...buatDataDemo("2026-03-15"), bed: [], admisi: [] };
     expect(ringkasanBed(kosong)).toMatchObject({ total: 0, terisi: 0, bor: 0 });
+  });
+
+  it("tidak menghitung bed di kamar nonaktif", () => {
+    const state = stateDasar();
+    state.kamar.push({ id: "kamar-lama", nama: "Kamar Lama", kelas: "II", tarifHarian: 300_000, aktif: false });
+    state.bed.push({ id: "bed-lama", kamarId: "kamar-lama", kode: "A", status: "terisi" });
+
+    expect(ringkasanBed(state)).toMatchObject({ total: 2, terisi: 0, bor: 0 });
+  });
+});
+
+describe("selector dokter", () => {
+  it("hanya mengembalikan dokter yang aktif", () => {
+    const state = stateDasar();
+    state.pengguna.push({ id: "u-dokter-nonaktif", nama: "dr. Lama", peran: "dokter", aktif: false });
+
+    const dokter = dokterAktif(state);
+
+    expect(dokter.map((d) => d.nama)).toEqual(["dr. Ayu"]);
+  });
+
+  it("tidak mengembalikan peran selain dokter", () => {
+    const dokter = dokterAktif(stateDasar());
+
+    expect(dokter.every((d) => d.peran === "dokter")).toBe(true);
+  });
+});
+
+describe("selector denah bed", () => {
+  it("mengelompokkan bed per kamar dengan kelas dan tarif harian", () => {
+    const state = stateDasar();
+    state.kamar.push({ id: "kamar-2", nama: "Anggrek", kelas: "VIP", tarifHarian: 900_000, aktif: true });
+    state.bed.push({ id: "bed-3", kamarId: "kamar-2", kode: "A", status: "kosong" });
+
+    const denah = denahBed(state);
+
+    expect(denah).toHaveLength(2);
+    expect(denah[0]).toMatchObject({ nama: "Melati 1", kelas: "I", tarifHarian: 500_000 });
+    expect(denah[0]!.bed.map((b) => b.kode)).toEqual(["A", "B"]);
+    expect(denah[1]!.bed.map((b) => b.id)).toEqual(["bed-3"]);
+  });
+
+  it("tidak menampilkan kamar tidak aktif maupun bed-nya", () => {
+    const state = stateDasar();
+    state.kamar[0]!.aktif = false;
+
+    expect(denahBed(state)).toEqual([]);
+  });
+
+  it("memuat status bed apa adanya, termasuk dibersihkan", () => {
+    const state = stateDasar();
+    state.bed[1]!.status = "dibersihkan";
+
+    const bed = denahBed(state)[0]!.bed;
+
+    expect(bed.map((b) => b.status)).toEqual(["kosong", "dibersihkan"]);
+  });
+});
+
+describe("alasan bed tidak tersedia", () => {
+  it("mengembalikan null untuk bed kosong", () => {
+    expect(alasanBedTidakTersedia(stateDasar(), "bed-1")).toBeNull();
+  });
+
+  it("menyebut bed baru saja terisi bila statusnya terisi", () => {
+    const state = stateDasar();
+    state.bed[0]!.status = "terisi";
+
+    expect(alasanBedTidakTersedia(state, "bed-1")).toContain("baru saja terisi");
+  });
+
+  it("menjelaskan bed belum siap dipakai bila masih dibersihkan", () => {
+    const state = stateDasar();
+    state.bed[0]!.status = "dibersihkan";
+
+    expect(alasanBedTidakTersedia(state, "bed-1")).toContain("belum siap dipakai");
+  });
+
+  it("mengembalikan alasan bila bed tidak ditemukan", () => {
+    expect(alasanBedTidakTersedia(stateDasar(), "bed-hantu")).toBe("Bed tidak ditemukan.");
+  });
+
+  it("memberi pesan yang sama dengan store saat admisi ditolak", () => {
+    const { store } = stateDenganAdmisi();
+    const bed = store.getState().bed[0]!;
+
+    expect(alasanBedTidakTersedia(store.getState(), bed.id)).toContain("baru saja terisi");
   });
 });
 
