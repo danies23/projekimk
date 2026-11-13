@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("the design system showcase loads and carries the Dani Medical Center identity", async ({ page }) => {
-  const response = await page.goto("/");
+  const response = await page.goto("/design-system");
 
   expect(response?.status()).toBe(200);
 
@@ -14,7 +14,7 @@ test("the design system showcase loads and carries the Dani Medical Center ident
 });
 
 test("the type scale actually renders different sizes, not one fallback size", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/design-system");
 
   const sizes = await page.evaluate(() => {
     const px = (selector: string) => {
@@ -38,9 +38,10 @@ test("the type scale actually renders different sizes, not one fallback size", a
 });
 
 test("interactive targets meet the 44px minimum for touch", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/design-system");
 
-  const buttons = page.getByRole("button");
+  // Dibatasi ke isi halaman: tombol dev-tools Next.js bukan bagian antarmuka.
+  const buttons = page.getByRole("main").getByRole("button");
   const count = await buttons.count();
   expect(count).toBeGreaterThan(0);
 

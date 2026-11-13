@@ -16,7 +16,6 @@ export type Resource =
   | "klinis"
   | "farmasi"
   | "kasir"
-  | "checkout"
   | "laporan"
   | "administrasi"
   | "audit";
@@ -75,12 +74,16 @@ export const IZIN: Record<Peran, IzinPeran> = {
     tindakan: SEMUA_LAPORAN,
   },
   admin: {
-    resource: ["dashboard", "kamar", "kasir", "laporan", "administrasi", "audit"],
+    // Admin ikut memelihara master obat bersama apoteker (spec, user story 96),
+    // jadi ia perlu akses modul Farmasi.
+    resource: ["dashboard", "kamar", "farmasi", "kasir", "laporan", "administrasi", "audit"],
     tindakan: [
       "checkout.lakukan",
       "checkout.override",
       "master.kamar",
       "master.tindakan",
+      "obat.buat",
+      "obat.stokMasuk",
       "pengguna.kelola",
       "audit.lihat",
       ...SEMUA_LAPORAN,
@@ -118,7 +121,7 @@ export function menuUntuk(peran: Peran | null | undefined): typeof MODUL {
 
 /**
  * Pemetaan aksi store ke izin yang diperlukan, satu tempat dan bukan di
- * komponen. Tipe `Record<Action["type"], …>` membuat aksi baru tanpa izin
+ * komponen. Tipe `Record<Action["type"], â€¦>` membuat aksi baru tanpa izin
  * gagal dikompilasi, alih-alih lolos tanpa penjagaan.
  */
 export const IZIN_AKSI: Record<ActionType, Tindakan> = {

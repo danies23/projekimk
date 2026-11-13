@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Source_Sans_3, Source_Serif_4 } from "next/font/google";
+import { Providers } from "./providers";
 import "./globals.css";
 
 const sourceSans = Source_Sans_3({
@@ -25,7 +26,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id" className={`${sourceSans.variable} ${sourceSerif.variable}`}>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

@@ -13,7 +13,7 @@ export interface OpsiStoreDemo {
 }
 
 /** Tanggal kalender lokal. Sengaja lokal, bukan UTC, agar cocok dengan "hari ini" bagi pengguna. */
-function tanggalLokal(waktu: Date): Tanggal {
+export function tanggalLokal(waktu: Date): Tanggal {
   const bulan = String(waktu.getMonth() + 1).padStart(2, "0");
   const tanggal = String(waktu.getDate()).padStart(2, "0");
   return `${waktu.getFullYear()}-${bulan}-${tanggal}`;
