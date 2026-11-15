@@ -27,6 +27,7 @@ export type Tindakan =
   | "bed.siap"
   | "catatan.tulis"
   | "catatan.koreksi"
+  | "instruksi.jalankan"
   | "tindakan.tambah"
   | "resep.buat"
   | "resep.siapkan"
@@ -59,7 +60,7 @@ export const IZIN: Record<Peran, IzinPeran> = {
   },
   perawat: {
     resource: ["dashboard", "klinis", "kamar"],
-    tindakan: ["catatan.tulis", "catatan.koreksi", "bed.pindah", "bed.siap"],
+    tindakan: ["catatan.tulis", "catatan.koreksi", "instruksi.jalankan", "bed.pindah", "bed.siap"],
   },
   apoteker: {
     resource: ["dashboard", "farmasi", "laporan"],
@@ -133,6 +134,7 @@ export const IZIN_AKSI: Record<ActionType, Tindakan> = {
   "bed/siap": "bed.siap",
   "catatan/ditulis": "catatan.tulis",
   "catatan/dikoreksi": "catatan.koreksi",
+  "instruksi/dijalankan": "instruksi.jalankan",
   "tindakan/ditambahkan": "tindakan.tambah",
   "resep/dibuat": "resep.buat",
   "resep/siapkan": "resep.siapkan",

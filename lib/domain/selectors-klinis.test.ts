@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { PENGGUNA_UJI, depsUji, stateDasar, stateDenganAdmisi } from "./test-utils";
-import { admisiUntukDokter, riwayatKlinis, totalTindakan } from "./selectors";
+import {
+  admisiUntukDokter,
+  instruksiBelumDijalankan,
+  riwayatKlinis,
+  tandaVitalTerakhir,
+  totalTindakan,
+} from "./selectors";
 import type { Store } from "./actions";
 
 /** Setiap dispatch memakai jam yang berbeda agar urutan waktu dapat diuji. */
@@ -113,6 +119,70 @@ describe("selector riwayat klinis", () => {
 
     expect(riwayat).toHaveLength(1);
     expect(riwayat[0]).toMatchObject({ jenis: "catatan", catatan: { isi: "Catatan pasien pertama." } });
+  });
+});
+
+describe("selector pemantauan perawat", () => {
+  function catatVital(store: Store, admisiId: string, suhu: number) {
+    const hasil = store.dispatch({
+      type: "catatan/ditulis",
+      olehId: PENGGUNA_UJI.perawat,
+      admisiId,
+      jenis: "tanda_vital",
+      isi: "Pemantauan rutin.",
+      diagnosa: null,
+      rencana: null,
+      tandaVital: { tekananDarah: "120/80", suhu, nadi: 82, pernapasan: 18, saturasi: 98 },
+    });
+    if (!hasil.ok) throw new Error(hasil.alasan);
+  }
+
+  it("mengembalikan tanda vital terakhir per admisi, bukan semua catatan", () => {
+    const { store, admisiId } = stateDenganAdmisi(depsBerjam());
+    catatVital(store, admisiId, 36.5);
+    catatVital(store, admisiId, 38.2);
+
+    const terakhir = tandaVitalTerakhir(store.getState(), admisiId);
+
+    expect(terakhir?.tandaVital?.suhu).toBe(38.2);
+  });
+
+  it("mengembalikan null bila belum ada tanda vital", () => {
+    const { store, admisiId } = stateDenganAdmisi(depsBerjam());
+
+    expect(tandaVitalTerakhir(store.getState(), admisiId)).toBeNull();
+  });
+
+  it("mengembalikan instruksi dokter yang belum dijalankan, terbaru dulu", () => {
+    const { store, admisiId } = stateDenganAdmisi(depsBerjam());
+    const lama = store.dispatch({
+      type: "catatan/ditulis",
+      olehId: PENGGUNA_UJI.dokter,
+      admisiId,
+      jenis: "visite",
+      isi: "Pagi.",
+      diagnosa: "PPOK",
+      rencana: "Nebulisasi pagi.",
+      tandaVital: null,
+    });
+    const baru = store.dispatch({
+      type: "catatan/ditulis",
+      olehId: PENGGUNA_UJI.dokter,
+      admisiId,
+      jenis: "visite",
+      isi: "Siang.",
+      diagnosa: "PPOK",
+      rencana: "Nebulisasi sore.",
+      tandaVital: null,
+    });
+    if (!lama.ok || !baru.ok) throw new Error("setup gagal");
+
+    const instruksi = instruksiBelumDijalankan(store.getState(), admisiId);
+    expect(instruksi.map((i) => i.catatan.id)).toEqual([baru.id, lama.id]);
+
+    store.dispatch({ type: "instruksi/dijalankan", olehId: PENGGUNA_UJI.perawat, catatanId: baru.id });
+
+    expect(instruksiBelumDijalankan(store.getState(), admisiId).map((i) => i.catatan.id)).toEqual([lama.id]);
   });
 });
 

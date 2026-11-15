@@ -1,4 +1,5 @@
 import { KUNCI_SNAPSHOT, type Penyimpanan } from "./penyimpanan";
+import { buatStateKosong } from "./state";
 import type { State } from "./types";
 
 interface Snapshot {
@@ -17,14 +18,18 @@ export function simpanSnapshot(penyimpanan: Penyimpanan, state: State, sekarang 
   }
 }
 
-/** Memuat snapshot; isi rusak atau versi asing dianggap tidak ada. */
+/**
+ * Memuat snapshot; isi rusak atau versi asing dianggap tidak ada. Snapshot
+ * lama bisa dibuat sebelum sebuah koleksi ada, jadi koleksi yang hilang diisi
+ * kosong di sini alih-alih membuat layar melempar saat membaca `.map`/`.filter`.
+ */
 export function muatSnapshot(penyimpanan: Penyimpanan): State | null {
   try {
     const mentah = penyimpanan.getItem(KUNCI_SNAPSHOT);
     if (!mentah) return null;
     const snapshot = JSON.parse(mentah) as Snapshot;
     if (snapshot?.versi !== 1 || !snapshot.state) return null;
-    return snapshot.state;
+    return { ...buatStateKosong(), ...snapshot.state };
   } catch {
     return null;
   }

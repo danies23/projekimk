@@ -217,6 +217,38 @@ export function admisiUntukDokter(state: State, dokterId: Id): InfoAdmisi[] {
   return daftarAdmisiAktif(state).filter((info) => info.dokter.id === dokterId);
 }
 
+/** Catatan tanda vital terbaru satu admisi; `null` bila belum pernah dicatat. */
+export function tandaVitalTerakhir(state: State, admisiId: Id): CatatanKlinis | null {
+  return (
+    state.catatanKlinis
+      .filter((c) => c.admisiId === admisiId && c.jenis === "tanda_vital" && !c.koreksiUntukId)
+      .sort((a, b) => b.waktu.localeCompare(a.waktu))[0] ?? null
+  );
+}
+
+export interface InstruksiDokter {
+  catatan: CatatanKlinis;
+  dokter: Pengguna | null;
+}
+
+/**
+ * Rencana visita dokter pada satu admisi yang belum ditandai perawat sebagai
+ * dijalankan, terbaru dulu. Instruksi adalah `rencana` catatan visite; tidak
+ * ada entitas terpisah.
+ */
+export function instruksiBelumDijalankan(state: State, admisiId: Id): InstruksiDokter[] {
+  const dijalankan = new Set(state.instruksiDijalankan.map((i) => i.catatanId));
+  const penulisDokter = (c: CatatanKlinis) =>
+    !c.koreksiUntukId &&
+    c.rencana &&
+    state.pengguna.find((p) => p.id === c.penulisId)?.peran === "dokter";
+  return state.catatanKlinis
+    .filter((c) => c.admisiId === admisiId && penulisDokter(c))
+    .filter((c) => !dijalankan.has(c.id))
+    .sort((a, b) => b.waktu.localeCompare(a.waktu))
+    .map((catatan) => ({ catatan, dokter: penggunaById(state, catatan.penulisId) ?? null }));
+}
+
 /** Total tarif tindakan pada satu admisi; `olehId` membatasi pada pencatatnya. */
 export function totalTindakan(state: State, admisiId: Id, olehId?: Id): number {
   return state.tindakanAdmisi

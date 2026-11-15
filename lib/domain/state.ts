@@ -9,6 +9,7 @@ export function buatStateKosong(): State {
     bed: [],
     admisi: [],
     catatanKlinis: [],
+    instruksiDijalankan: [],
     tindakanMaster: [],
     tindakanAdmisi: [],
     obat: [],

@@ -119,6 +119,18 @@ export interface CatatanKlinis {
   dikoreksiOlehId: Id | null;
 }
 
+/**
+ * Tanda perawat bahwa rencana (instruksi) pada satu catatan dokter sudah
+ * dijalankan. Entri terpisah karena catatan klinis append-only dan penandanya
+ * bukan penulis catatan.
+ */
+export interface InstruksiDijalankan {
+  id: Id;
+  catatanId: Id;
+  olehId: Id;
+  waktu: Waktu;
+}
+
 export interface TindakanMaster {
   id: Id;
   nama: string;
@@ -195,6 +207,7 @@ export type AksiAudit =
   | "checkout.override"
   | "rekam_medis.ditulis"
   | "rekam_medis.dikoreksi"
+  | "instruksi.dijalankan"
   | "resep.dibuat"
   | "resep.status"
   | "obat.diserahkan"
@@ -239,6 +252,7 @@ export interface State {
   bed: Bed[];
   admisi: Admisi[];
   catatanKlinis: CatatanKlinis[];
+  instruksiDijalankan: InstruksiDijalankan[];
   tindakanMaster: TindakanMaster[];
   tindakanAdmisi: TindakanAdmisi[];
   obat: Obat[];

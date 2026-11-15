@@ -339,6 +339,18 @@ export function buatDataDemo(hariIni: Tanggal): State {
     if (!hasil.ok) throw new Error(`data demo tanda vital gagal: ${hasil.alasan}`);
   }
 
+  // Tiga instruksi dokter sudah dijalankan perawat agar statusnya terlihat,
+  // dan sisanya tertinggal sebagai pekerjaan yang belum dikerjakan.
+  for (const admisi of admisiAktif.slice(0, 3)) {
+    const instruksi = store.getState().catatanKlinis.find(
+      (c) => c.admisiId === admisi.admisiId && c.jenis === "visite" && c.rencana,
+    );
+    if (!instruksi) continue;
+    pada(-1);
+    const hasil = store.dispatch({ type: "instruksi/dijalankan", olehId: ID.perawat, catatanId: instruksi.id });
+    if (!hasil.ok) throw new Error(`data demo instruksi gagal: ${hasil.alasan}`);
+  }
+
   // Satu catatan dikoreksi agar penanda "telah dikoreksi" terlihat di demo.
   {
     const catatan = store.getState().catatanKlinis.find((c) => c.jenis === "visite" && c.admisiId === admisiAktif[1]!.admisiId);

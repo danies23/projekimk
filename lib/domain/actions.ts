@@ -91,6 +91,12 @@ export interface ActionCatatanDikoreksi {
   isi: string;
 }
 
+export interface ActionInstruksiDijalankan {
+  type: "instruksi/dijalankan";
+  olehId: Id;
+  catatanId: Id;
+}
+
 export interface ActionResepDibuat {
   type: "resep/dibuat";
   olehId: Id;
@@ -144,6 +150,7 @@ export type Action =
   | ActionPenggunaDibuat
   | ActionCatatanDitulis
   | ActionCatatanDikoreksi
+  | ActionInstruksiDijalankan
   | ActionResepDibuat
   | ActionResepSiapkan
   | ActionResepSerahkan

@@ -76,6 +76,10 @@ _Avoid_: Ronda, round
 Prosedur medis berbayar yang dikerjakan pada pasien dan punya tarif.
 _Avoid_: Prosedur, action, layanan
 
+**Instruksi**:
+Rencana pada catatan visite dokter yang harus dijalankan perawat. Perawat menandainya sudah dijalankan sebagai entri terpisah, bukan dengan mengubah catatan dokter.
+_Avoid_: Order, task, perintah, to-do
+
 **Resep**:
 Perintah obat dari dokter untuk satu admisi, diteruskan ke Farmasi.
 _Avoid_: Prescription (di percakapan), order obat

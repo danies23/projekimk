@@ -3,6 +3,7 @@ import { createMemoriPenyimpanan, buatPenyimpananAman, type Penyimpanan } from "
 import { buatStateKosong } from "./state";
 import { IDENTITAS_PASIEN, PENGGUNA_UJI, depsUji, stateDasar, storeUji } from "./test-utils";
 import { muatSnapshot, simpanSnapshot } from "./persistensi";
+import type { State } from "./types";
 
 function stateBerisiPasien() {
   const store = storeUji(depsUji(), stateDasar());
@@ -33,6 +34,22 @@ describe("penyimpanan", () => {
     };
 
     expect(muatSnapshot(penyimpanan)).toBeNull();
+  });
+
+  it("mengisi koleksi yang belum ada pada snapshot lama agar layar tidak melempar", () => {
+    const penyimpanan = createMemoriPenyimpanan();
+    // Snapshot versi 1 dari sebelum `instruksiDijalankan` ada.
+    const lama = stateBerisiPasien() as Partial<State> & Record<string, unknown>;
+    delete lama.instruksiDijalankan;
+    penyimpanan.setItem(
+      "dmc.admisi.snapshot.v1",
+      JSON.stringify({ versi: 1, disimpanPada: "2026-01-01T00:00:00.000Z", state: lama }),
+    );
+
+    const hasil = muatSnapshot(penyimpanan);
+
+    expect(hasil?.instruksiDijalankan).toEqual([]);
+    expect(hasil?.pasien).toHaveLength(1);
   });
 
   it("kegagalan menulis penyimpanan tidak melempar error", () => {

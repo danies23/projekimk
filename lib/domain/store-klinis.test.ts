@@ -51,6 +51,40 @@ describe("dispatch: rekam medis", () => {
     });
   });
 
+  it("menolak catatan tanda vital tanpa nilai", () => {
+    const { store, admisiId } = denganAdmisi();
+    const hasil = store.dispatch({
+      type: "catatan/ditulis",
+      olehId: PENGGUNA_UJI.perawat,
+      admisiId,
+      jenis: "tanda_vital",
+      isi: "Pemantauan pagi",
+      diagnosa: null,
+      rencana: null,
+      tandaVital: null,
+    });
+
+    expect(hasil).toEqual({ ok: false, alasan: expect.stringContaining("Tanda vital") });
+    expect(store.getState().catatanKlinis).toHaveLength(0);
+  });
+
+  it("menolak nilai tanda vital di luar rentang wajar", () => {
+    const { store, admisiId } = denganAdmisi();
+    const hasil = store.dispatch({
+      type: "catatan/ditulis",
+      olehId: PENGGUNA_UJI.perawat,
+      admisiId,
+      jenis: "tanda_vital",
+      isi: "Pemantauan pagi",
+      diagnosa: null,
+      rencana: null,
+      tandaVital: { tekananDarah: "120-80", suhu: 47, nadi: 82, pernapasan: 18, saturasi: 98 },
+    });
+
+    expect(hasil.ok).toBe(false);
+    expect(store.getState().catatanKlinis).toHaveLength(0);
+  });
+
   it("tidak menyediakan aksi untuk menghapus catatan", () => {
     const aksi: string[] = ["catatan/dihapus", "catatan/hapus", "rekam_medis/dihapus"];
     const { store, admisiId } = denganAdmisi();
@@ -160,6 +194,91 @@ describe("dispatch: rekam medis", () => {
     const aksi = store.getState().audit.map((a) => a.aksi);
     expect(aksi).toContain("rekam_medis.ditulis");
     expect(aksi).toContain("rekam_medis.dikoreksi");
+  });
+});
+
+describe("instruksi dokter dijalankan perawat", () => {
+  /** Visite dokter dengan rencana — rencana itulah instruksi yang harus dijalankan. */
+  function visiteDenganRencana(store: ReturnType<typeof stateDenganAdmisi>["store"], admisiId: string) {
+    const hasil = store.dispatch({
+      type: "catatan/ditulis",
+      olehId: PENGGUNA_UJI.dokter,
+      admisiId,
+      jenis: "visite",
+      isi: "Sesak berkurang.",
+      diagnosa: "PPOK",
+      rencana: "Nebulisasi tiap 8 jam.",
+      tandaVital: null,
+    });
+    if (!hasil.ok) throw new Error(hasil.alasan);
+    return hasil.id;
+  }
+
+  it("perawat menandai instruksi sebagai sudah dijalankan dan statusnya tersimpan", () => {
+    const { store, admisiId } = stateDenganAdmisi();
+    const catatanId = visiteDenganRencana(store, admisiId);
+
+    const hasil = store.dispatch({ type: "instruksi/dijalankan", olehId: PENGGUNA_UJI.perawat, catatanId });
+
+    expect(hasil.ok).toBe(true);
+    expect(store.getState().instruksiDijalankan).toEqual([
+      { id: expect.any(String), catatanId, olehId: PENGGUNA_UJI.perawat, waktu: expect.any(String) },
+    ]);
+  });
+
+  it("menolak menandai instruksi yang sama dua kali", () => {
+    const { store, admisiId } = stateDenganAdmisi();
+    const catatanId = visiteDenganRencana(store, admisiId);
+    store.dispatch({ type: "instruksi/dijalankan", olehId: PENGGUNA_UJI.perawat, catatanId });
+
+    const hasil = store.dispatch({ type: "instruksi/dijalankan", olehId: PENGGUNA_UJI.perawat, catatanId });
+
+    expect(hasil).toEqual({ ok: false, alasan: expect.stringContaining("sudah ditandai") });
+    expect(store.getState().instruksiDijalankan).toHaveLength(1);
+  });
+
+  it("menolak menandai catatan yang tidak memuat instruksi", () => {
+    const { store, admisiId } = stateDenganAdmisi();
+    const tanpaRencana = store.dispatch({
+      type: "catatan/ditulis",
+      olehId: PENGGUNA_UJI.perawat,
+      admisiId,
+      jenis: "perkembangan",
+      isi: "Pasien tidur nyenyak.",
+      diagnosa: null,
+      rencana: null,
+      tandaVital: null,
+    });
+    if (!tanpaRencana.ok) throw new Error(tanpaRencana.alasan);
+
+    const hasil = store.dispatch({
+      type: "instruksi/dijalankan",
+      olehId: PENGGUNA_UJI.perawat,
+      catatanId: tanpaRencana.id,
+    });
+
+    expect(hasil).toEqual({ ok: false, alasan: expect.stringContaining("instruksi") });
+  });
+
+  it("menolak menandai instruksi pada admisi yang sudah selesai", () => {
+    const { store, admisiId } = stateDenganAdmisi();
+    const catatanId = visiteDenganRencana(store, admisiId);
+    const keluar = store.dispatch({ type: "checkout", olehId: PENGGUNA_UJI.admin, admisiId, override: { alasan: "Rujukan" } });
+    if (!keluar.ok) throw new Error(keluar.alasan);
+
+    const hasil = store.dispatch({ type: "instruksi/dijalankan", olehId: PENGGUNA_UJI.perawat, catatanId });
+
+    expect(hasil).toEqual({ ok: false, alasan: "Admisi ini sudah selesai." });
+    expect(store.getState().instruksiDijalankan).toHaveLength(0);
+  });
+
+  it("mencatat penandaan instruksi di audit log", () => {
+    const { store, admisiId } = stateDenganAdmisi();
+    const catatanId = visiteDenganRencana(store, admisiId);
+
+    store.dispatch({ type: "instruksi/dijalankan", olehId: PENGGUNA_UJI.perawat, catatanId });
+
+    expect(store.getState().audit.some((a) => a.aksi === "instruksi.dijalankan")).toBe(true);
   });
 });
 

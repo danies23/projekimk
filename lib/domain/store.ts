@@ -4,7 +4,7 @@ import { audit } from "./audit";
 import { IZIN_AKSI, boleh } from "./izin";
 import { alasanBedTidakTersedia, pasienDenganNik } from "./selectors";
 import { nilaiTagihan } from "./tagihan";
-import type { Admisi, Bed, Hasil, Pasien, State } from "./types";
+import type { Admisi, Bed, Hasil, Pasien, State, TandaVital } from "./types";
 
 type Handler<A extends Action> = (draft: State, action: A, deps: StoreDeps) => Hasil;
 
@@ -375,12 +375,38 @@ const penggunaDibuat: Handler<Extract<Action, { type: "pengguna/dibuat" }>> = (d
   return { ok: true, id: pengguna.id };
 };
 
+/**
+ * Rentang fisiologis yang mustahil diisi tanpa salah ketik; nilai di luar ini
+ * ditolak supaya tren tanda vital tidak dirusak satu entri.
+ */
+function tandaVitalValid(v: TandaVital): boolean {
+  const dalam = (nilai: number, min: number, max: number) =>
+    Number.isFinite(nilai) && nilai >= min && nilai <= max;
+  const [sistolik, diastolik] = v.tekananDarah.split("/").map(Number);
+  return (
+    /^\d{2,3}\/\d{2,3}$/.test(v.tekananDarah) &&
+    sistolik! > diastolik! &&
+    dalam(v.suhu, 30, 45) &&
+    dalam(v.nadi, 20, 250) &&
+    dalam(v.pernapasan, 5, 80) &&
+    dalam(v.saturasi, 0, 100)
+  );
+}
+
 const catatanDitulis: Handler<Extract<Action, { type: "catatan/ditulis" }>> = (draft, action, deps) => {
   const admisi = draft.admisi.find((a) => a.id === action.admisiId);
   if (!admisi) return { ok: false, alasan: "Admisi tidak ditemukan." };
   // Catatan setelah pulang akan menempel pada rekam medis yang sudah ditutup.
   if (admisi.status !== "aktif") return { ok: false, alasan: "Admisi ini sudah selesai." };
   if (!action.isi.trim()) return { ok: false, alasan: "Isi catatan tidak boleh kosong." };
+  if (action.jenis === "tanda_vital") {
+    if (!action.tandaVital) {
+      return { ok: false, alasan: "Tanda vital wajib diisi untuk catatan pemantauan." };
+    }
+    if (!tandaVitalValid(action.tandaVital)) {
+      return { ok: false, alasan: "Nilai tanda vital di luar rentang wajar. Periksa kembali tekanan darah, suhu, nadi, pernapasan, dan saturasi." };
+    }
+  }
 
   const catatan = {
     id: deps.id("catatan"),
@@ -434,6 +460,29 @@ const catatanDikoreksi: Handler<Extract<Action, { type: "catatan/dikoreksi" }>> 
     ringkasan: `Catatan ${asli.id} dikoreksi; catatan asli tetap tersimpan.`,
   });
   return { ok: true, id: koreksi.id };
+};
+
+const instruksiDijalankan: Handler<Extract<Action, { type: "instruksi/dijalankan" }>> = (draft, action, deps) => {
+  const catatan = draft.catatanKlinis.find((c) => c.id === action.catatanId);
+  if (!catatan) return { ok: false, alasan: "Catatan tidak ditemukan." };
+  const admisi = draft.admisi.find((a) => a.id === catatan.admisiId);
+  if (!admisi) return { ok: false, alasan: "Admisi tidak ditemukan." };
+  if (admisi.status !== "aktif") return { ok: false, alasan: "Admisi ini sudah selesai." };
+  // Instruksi adalah rencana pada catatan dokter; catatan perawat tidak berisi rencana.
+  if (!catatan.rencana) return { ok: false, alasan: "Catatan ini tidak memuat instruksi dokter." };
+  if (draft.instruksiDijalankan.some((i) => i.catatanId === catatan.id)) {
+    return { ok: false, alasan: "Instruksi ini sudah ditandai dijalankan." };
+  }
+
+  const entri = { id: deps.id("instruksi"), catatanId: catatan.id, olehId: action.olehId, waktu: deps.sekarang() };
+  draft.instruksiDijalankan.push(entri);
+  audit(draft, deps, action.olehId, {
+    aksi: "instruksi.dijalankan",
+    entitas: "catatan",
+    entitasId: catatan.id,
+    ringkasan: `Instruksi "${catatan.rencana}" ditandai sudah dijalankan.`,
+  });
+  return { ok: true, id: entri.id };
 };
 
 const resepDibuat: Handler<Extract<Action, { type: "resep/dibuat" }>> = (draft, action, deps) => {
@@ -613,6 +662,7 @@ const handlers: { [K in Action["type"]]: Handler<Extract<Action, { type: K }>> }
   "pengguna/dibuat": penggunaDibuat,
   "catatan/ditulis": catatanDitulis,
   "catatan/dikoreksi": catatanDikoreksi,
+  "instruksi/dijalankan": instruksiDijalankan,
   "resep/dibuat": resepDibuat,
   "resep/siapkan": resepSiapkan,
   "resep/serahkan": resepSerahkan,
