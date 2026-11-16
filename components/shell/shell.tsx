@@ -10,6 +10,7 @@ import { labelPeran } from "@/lib/label-peran";
 import { modulUntuk } from "@/lib/navigasi";
 import { JejakNavigasi } from "./jejak-navigasi";
 import { PengalihPeran } from "./pengalih-peran";
+import { ResetDataDemo } from "./reset-data-demo";
 import { useSesi } from "./sesi-provider";
 import { Sidebar } from "./sidebar";
 
@@ -58,6 +59,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </span>
               {pengguna.nama}
             </p>
+            <ResetDataDemo />
             <PengalihPeran />
           </div>
         </div>

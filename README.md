@@ -39,6 +39,7 @@ lib/                    token desain dan pendukung
 tests/e2e/              skenario Playwright
 docs/adr/               keputusan arsitektur
 docs/agents/            konfigurasi skill engineering
+docs/usability/         kit evaluasi usability dan rasional desain
 .scratch/               spec dan ticket
 ```
 
@@ -47,6 +48,7 @@ docs/agents/            konfigurasi skill engineering
 - `GLOSSARY.md` — istilah domain dan istilah yang dihindari
 - `PRD_Sistem_Administrasi_Rawat_Inap.md` — PRD asal
 - `docs/adr/` — keputusan yang sulit dibalik
+- `docs/usability/` — kit evaluasi usability (skenario, script, persetujuan, laporan) dan rasional desain
 - `.scratch/administrasi-rawat-inap/spec.md` — spec prototipe
 - `.scratch/administrasi-rawat-inap/issues/` — ticket per slice
 
