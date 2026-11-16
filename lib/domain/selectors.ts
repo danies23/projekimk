@@ -5,6 +5,7 @@ import type {
   Id,
   Kamar,
   KelasKamar,
+  Obat,
   Pasien,
   Pengguna,
   Resep,
@@ -247,6 +248,71 @@ export function instruksiBelumDijalankan(state: State, admisiId: Id): InstruksiD
     .filter((c) => !dijalankan.has(c.id))
     .sort((a, b) => b.waktu.localeCompare(a.waktu))
     .map((catatan) => ({ catatan, dokter: penggunaById(state, catatan.penulisId) ?? null }));
+}
+
+export interface BarisAntreanResep {
+  resepId: Id;
+  waktu: Waktu;
+  admisiId: Id;
+  pasien: Pasien;
+  dokter: Pengguna | null;
+  resep: Resep;
+  /** Admisi sudah checkout: tagihannya ditutup, resep tidak dapat diproses lagi. */
+  admisiSelesai: boolean;
+}
+
+export interface AntreanFarmasi {
+  menunggu: BarisAntreanResep[];
+  disiapkan: BarisAntreanResep[];
+  diserahkan: BarisAntreanResep[];
+}
+
+/**
+ * Antrean resep per status. Tiap kelompok diurutkan dari yang terlama supaya
+ * resep yang datang lebih dulu tidak terlantar; obat yang sudah diserahkan
+ * tetap terlihat agar apoteker dapat menelusuri pekerjaan yang selesai.
+ */
+export function antreanFarmasi(state: State): AntreanFarmasi {
+  const baris = state.resep.map((resep): BarisAntreanResep | null => {
+    const admisi = state.admisi.find((a) => a.id === resep.admisiId);
+    if (!admisi) return null;
+    const pasien = pilihPasienById(state, admisi.pasienId);
+    if (!pasien) return null;
+    return {
+      resepId: resep.id,
+      waktu: resep.waktu,
+      admisiId: admisi.id,
+      pasien,
+      dokter: penggunaById(state, resep.dokterId) ?? null,
+      resep,
+      admisiSelesai: admisi.status !== "aktif",
+    };
+  });
+  const urut = (status: Resep["status"]) =>
+    baris
+      .filter((b): b is BarisAntreanResep => !!b && b.resep.status === status)
+      .sort((a, b) => a.waktu.localeCompare(b.waktu));
+  return { menunggu: urut("menunggu"), disiapkan: urut("disiapkan"), diserahkan: urut("diserahkan") };
+}
+
+/** Obat yang stoknya sudah di bawah stok minimum; stok pas di minimum belum menipis. */
+export function obatStokMenipis(state: State): Obat[] {
+  return state.obat.filter((o) => o.stok < o.stokMinimum);
+}
+
+/**
+ * Jumlah yang dibutuhkan per obat untuk satu resep. Baris berisi obat yang sama
+ * dijumlahkan lebih dulu; tanpa itu dua baris 80 tablet masing-masing lolos
+ * pemeriksaan terhadap stok 100. Store memakai fungsi ini untuk menolak
+ * penyerahan, jadi label "stok kurang" di layar tidak pernah berbeda dari
+ * keputusan store.
+ */
+export function kebutuhanObat(resep: Resep): Map<Id, number> {
+  const kebutuhan = new Map<Id, number>();
+  for (const item of resep.items) {
+    kebutuhan.set(item.obatId, (kebutuhan.get(item.obatId) ?? 0) + item.jumlah);
+  }
+  return kebutuhan;
 }
 
 /** Total tarif tindakan pada satu admisi; `olehId` membatasi pada pencatatnya. */

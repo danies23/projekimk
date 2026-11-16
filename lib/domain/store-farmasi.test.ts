@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { IDENTITAS_PASIEN, PENGGUNA_UJI, depsUji, stateDasar as stateUjiDasar, stateDenganAdmisi } from "./test-utils";
+import type { InputObat } from "./actions";
 import type { State } from "./types";
 
 function denganAdmisi(stokParacetamol = 100) {
@@ -117,6 +118,28 @@ describe("dispatch: resep dan farmasi", () => {
     expect(store.getState().obat.find((o) => o.id === "obat-1")!.stok).toBe(0);
   });
 
+  it("menolak penyerahan obat pada admisi yang sudah checkout", () => {
+    const { store, admisiId } = denganAdmisi(100);
+    const dibuat = resep(store, admisiId, 10);
+    if (!dibuat.ok) throw new Error("setup gagal");
+    store.dispatch({ type: "resep/siapkan", olehId: PENGGUNA_UJI.apoteker, resepId: dibuat.id });
+    // Checkout lewat override admin: tagihan belum lunas pun admisi bisa ditutup.
+    const keluar = store.dispatch({
+      type: "checkout",
+      olehId: PENGGUNA_UJI.admin,
+      admisiId,
+      override: { alasan: "Rujukan mendesak" },
+    });
+    if (!keluar.ok) throw new Error(keluar.alasan);
+
+    const hasil = store.dispatch({ type: "resep/serahkan", olehId: PENGGUNA_UJI.apoteker, resepId: dibuat.id });
+
+    expect(hasil.ok).toBe(false);
+    // Tagihan yang sudah ditutup tidak boleh bertambah, dan stok tidak berkurang.
+    expect(store.getState().obat.find((o) => o.id === "obat-1")!.stok).toBe(100);
+    expect(store.getState().resep[0]!.status).toBe("disiapkan");
+  });
+
   it("mencatat penambahan stok dan menaikkan stok", () => {
     const { store } = denganAdmisi(100);
     const hasil = store.dispatch({
@@ -138,6 +161,49 @@ describe("dispatch: resep dan farmasi", () => {
 
     expect(hasil.ok).toBe(false);
     expect(store.getState().obat.find((o) => o.id === "obat-1")!.stok).toBe(100);
+  });
+});
+
+describe("dispatch: master obat", () => {
+  function tambahObat(store: ReturnType<typeof denganAdmisi>["store"], input: Partial<InputObat>) {
+    return store.dispatch({
+      type: "obat/dibuat",
+      olehId: PENGGUNA_UJI.apoteker,
+      input: { nama: "Cotrimoxazole 480 mg", satuan: "tablet", harga: 1_200, stok: 0, stokMinimum: 30, ...input },
+    });
+  }
+
+  it("menambahkan obat baru ke master beserta stok awalnya", () => {
+    const { store } = denganAdmisi();
+    const hasil = tambahObat(store, { stok: 25 });
+
+    expect(hasil.ok).toBe(true);
+    expect(store.getState().obat.at(-1)).toMatchObject({
+      nama: "Cotrimoxazole 480 mg",
+      satuan: "tablet",
+      harga: 1_200,
+      stok: 25,
+      stokMinimum: 30,
+    });
+    expect(store.getState().audit.some((a) => a.aksi === "obat.dibuat")).toBe(true);
+    // Stok awal ikut tercatat sebagai pergerakan masuk agar riwayatnya utuh.
+    expect(store.getState().mutasiStok.at(-1)).toMatchObject({ jenis: "masuk", jumlah: 25, keterangan: "Stok awal" });
+  });
+
+  it("menolak obat dengan nama yang sudah terdaftar", () => {
+    const { store } = denganAdmisi();
+    const hasil = tambahObat(store, { nama: "  paracetamol 500 MG " });
+
+    expect(hasil).toEqual({ ok: false, alasan: expect.stringContaining("sudah terdaftar") });
+    expect(store.getState().obat).toHaveLength(2);
+  });
+
+  it("menolak harga, stok, atau stok minimum yang bukan bilangan bulat", () => {
+    const { store } = denganAdmisi();
+    for (const input of [{ harga: 0 }, { stok: -1 }, { stokMinimum: 1.5 }]) {
+      expect(tambahObat(store, input).ok, JSON.stringify(input)).toBe(false);
+    }
+    expect(store.getState().obat).toHaveLength(2);
   });
 });
 

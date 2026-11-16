@@ -1,4 +1,4 @@
-import { admisiAktif, ringkasanBed } from "./domain/selectors";
+import { admisiAktif, obatStokMenipis, ringkasanBed } from "./domain/selectors";
 import { tanggalLokal } from "./domain/store-demo";
 import { nilaiTagihan } from "./domain/tagihan";
 import type { SatuanAngka } from "./format";
@@ -74,7 +74,7 @@ export function ringkasanPeran(state: State, pengguna: Pengguna, hariIni: Tangga
       return [
         kartu("Resep menunggu", state.resep.filter((r) => r.status === "menunggu").length, "/farmasi"),
         kartu("Resep disiapkan", state.resep.filter((r) => r.status === "disiapkan").length, "/farmasi"),
-        kartu("Obat stok menipis", state.obat.filter((o) => o.stok < o.stokMinimum).length, "/farmasi"),
+        kartu("Obat stok menipis", obatStokMenipis(state).length, "/farmasi"),
       ];
     case "kasir":
       return [

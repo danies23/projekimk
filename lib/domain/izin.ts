@@ -140,6 +140,7 @@ export const IZIN_AKSI: Record<ActionType, Tindakan> = {
   "resep/siapkan": "resep.siapkan",
   "resep/serahkan": "obat.serahkan",
   "obat/stok-masuk": "obat.stokMasuk",
+  "obat/dibuat": "obat.buat",
   "pembayaran/dicatat": "pembayaran.catat",
   checkout: "checkout.lakukan",
   "tindakan-master/diubah": "master.tindakan",

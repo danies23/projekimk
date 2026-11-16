@@ -124,6 +124,20 @@ export interface ActionStokMasuk {
   keterangan: string;
 }
 
+export interface InputObat {
+  nama: string;
+  satuan: string;
+  harga: number;
+  stok: number;
+  stokMinimum: number;
+}
+
+export interface ActionObatDibuat {
+  type: "obat/dibuat";
+  olehId: Id;
+  input: InputObat;
+}
+
 export interface ActionTindakanDitambahkan {
   type: "tindakan/ditambahkan";
   olehId: Id;
@@ -155,6 +169,7 @@ export type Action =
   | ActionResepSiapkan
   | ActionResepSerahkan
   | ActionStokMasuk
+  | ActionObatDibuat
   | ActionTindakanDitambahkan
   | ActionTindakanMasterDiubah;
 

@@ -2,7 +2,7 @@ import type { Action, Store, StoreDeps } from "./actions";
 import { cloneState } from "./state";
 import { audit } from "./audit";
 import { IZIN_AKSI, boleh } from "./izin";
-import { alasanBedTidakTersedia, pasienDenganNik } from "./selectors";
+import { alasanBedTidakTersedia, kebutuhanObat, pasienDenganNik } from "./selectors";
 import { nilaiTagihan } from "./tagihan";
 import type { Admisi, Bed, Hasil, Pasien, State, TandaVital } from "./types";
 
@@ -524,9 +524,22 @@ const resepDibuat: Handler<Extract<Action, { type: "resep/dibuat" }>> = (draft, 
   return { ok: true, id: resep.id };
 };
 
+/**
+ * Admisi yang sudah checkout tidak boleh menerima perubahan farmasi: tagihannya
+ * sudah ditutup, jadi penyerahan obat baru akan mengubah total yang sudah
+ * dibayar. Sama dengan penjagaan pada resep dan tindakan baru.
+ */
+function alasanAdmisiTerkunci(draft: State, resep: { admisiId: string }): string | null {
+  const admisi = draft.admisi.find((a) => a.id === resep.admisiId);
+  if (!admisi) return "Admisi resep ini tidak ditemukan.";
+  return admisi.status === "aktif" ? null : "Admisi resep ini sudah selesai; tagihannya tidak dapat diubah lagi.";
+}
+
 const resepSiapkan: Handler<Extract<Action, { type: "resep/siapkan" }>> = (draft, action, deps) => {
   const resep = draft.resep.find((r) => r.id === action.resepId);
   if (!resep) return { ok: false, alasan: "Resep tidak ditemukan." };
+  const terkunci = alasanAdmisiTerkunci(draft, resep);
+  if (terkunci) return { ok: false, alasan: terkunci };
   if (resep.status !== "menunggu") {
     return { ok: false, alasan: `Resep berstatus ${resep.status} tidak dapat disiapkan lagi.` };
   }
@@ -543,16 +556,14 @@ const resepSiapkan: Handler<Extract<Action, { type: "resep/siapkan" }>> = (draft
 const resepSerahkan: Handler<Extract<Action, { type: "resep/serahkan" }>> = (draft, action, deps) => {
   const resep = draft.resep.find((r) => r.id === action.resepId);
   if (!resep) return { ok: false, alasan: "Resep tidak ditemukan." };
+  const terkunci = alasanAdmisiTerkunci(draft, resep);
+  if (terkunci) return { ok: false, alasan: terkunci };
   if (resep.status !== "disiapkan") {
     return { ok: false, alasan: "Siapkan resep terlebih dahulu sebelum menyerahkan obat." };
   }
-  // Baris berisi obat yang sama dijumlahkan lebih dulu. Tanpa ini, dua baris
-  // 80 tablet masing-masing lolos pemeriksaan terhadap stok 100.
-  const kebutuhan = new Map<string, number>();
-  for (const item of resep.items) {
-    kebutuhan.set(item.obatId, (kebutuhan.get(item.obatId) ?? 0) + item.jumlah);
-  }
-  for (const [obatId, jumlah] of kebutuhan) {
+  // Baris berisi obat yang sama dijumlahkan lebih dulu (lihat `kebutuhanObat`);
+  // tanpa ini dua baris 80 tablet masing-masing lolos pemeriksaan stok 100.
+  for (const [obatId, jumlah] of kebutuhanObat(resep)) {
     const obat = draft.obat.find((o) => o.id === obatId);
     if (!obat) return { ok: false, alasan: "Obat pada resep tidak ditemukan di master obat." };
     if (obat.stok < jumlah) {
@@ -605,6 +616,46 @@ const stokMasuk: Handler<Extract<Action, { type: "obat/stok-masuk" }>> = (draft,
     entitas: "obat",
     entitasId: obat.id,
     ringkasan: `${action.jumlah} ${obat.satuan} ${obat.nama} masuk; stok kini ${obat.stok}.`,
+  });
+  return { ok: true, id: obat.id };
+};
+
+const obatDibuat: Handler<Extract<Action, { type: "obat/dibuat" }>> = (draft, action, deps) => {
+  const { input } = action;
+  const nama = input.nama.trim();
+  const satuan = input.satuan.trim();
+  if (!nama) return { ok: false, alasan: "Nama obat wajib diisi." };
+  if (!satuan) return { ok: false, alasan: "Satuan obat wajib diisi, mis. tablet atau vial." };
+  if (draft.obat.some((o) => o.nama.toLowerCase() === nama.toLowerCase())) {
+    return { ok: false, alasan: `Obat ${nama} sudah terdaftar.` };
+  }
+  if (!bulatPositif(input.harga)) return { ok: false, alasan: "Harga obat harus bilangan bulat lebih dari nol." };
+  if (!Number.isInteger(input.stok) || input.stok < 0) {
+    return { ok: false, alasan: "Stok awal harus bilangan bulat nol atau lebih." };
+  }
+  if (!Number.isInteger(input.stokMinimum) || input.stokMinimum < 0) {
+    return { ok: false, alasan: "Stok minimum harus bilangan bulat nol atau lebih." };
+  }
+
+  const obat = { id: deps.id("obat"), nama, satuan, harga: input.harga, stok: input.stok, stokMinimum: input.stokMinimum };
+  draft.obat.push(obat);
+  // Stok awal ikut menjadi pergerakan agar riwayat pergerakan tidak bolong.
+  if (obat.stok > 0) {
+    draft.mutasiStok.push({
+      id: deps.id("mutasi"),
+      obatId: obat.id,
+      jenis: "masuk",
+      jumlah: obat.stok,
+      waktu: deps.sekarang(),
+      keterangan: "Stok awal",
+      olehId: action.olehId,
+    });
+  }
+  audit(draft, deps, action.olehId, {
+    aksi: "obat.dibuat",
+    entitas: "obat",
+    entitasId: obat.id,
+    ringkasan: `${obat.nama} (${obat.satuan}) ditambahkan ke master obat; stok ${obat.stok}.`,
   });
   return { ok: true, id: obat.id };
 };
@@ -667,6 +718,7 @@ const handlers: { [K in Action["type"]]: Handler<Extract<Action, { type: K }>> }
   "resep/siapkan": resepSiapkan,
   "resep/serahkan": resepSerahkan,
   "obat/stok-masuk": stokMasuk,
+  "obat/dibuat": obatDibuat,
   "tindakan/ditambahkan": tindakanDitambahkan,
   "tindakan-master/diubah": tindakanMasterDiubah,
 };

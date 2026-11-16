@@ -23,6 +23,7 @@ const AKSI_PENTING: AksiAudit[] = [
   "resep.status",
   "obat.diserahkan",
   "obat.stok_masuk",
+  "obat.dibuat",
   "tindakan.ditambahkan",
   "pembayaran.dicatat",
 ];
@@ -73,6 +74,11 @@ function jalankanAlurLengkap() {
   store.dispatch({ type: "resep/siapkan", olehId: PENGGUNA_UJI.apoteker, resepId: resep.id });
   store.dispatch({ type: "resep/serahkan", olehId: PENGGUNA_UJI.apoteker, resepId: resep.id });
   store.dispatch({ type: "obat/stok-masuk", olehId: PENGGUNA_UJI.apoteker, obatId: "obat-1", jumlah: 20, keterangan: "Restock" });
+  store.dispatch({
+    type: "obat/dibuat",
+    olehId: PENGGUNA_UJI.apoteker,
+    input: { nama: "Cotrimoxazole 480 mg", satuan: "tablet", harga: 1_200, stok: 0, stokMinimum: 10 },
+  });
   store.dispatch({ type: "tindakan/ditambahkan", olehId: PENGGUNA_UJI.dokter, admisiId, tindakanId: "tindakan-1" });
 
   // Override oleh Admin menutup admisi meski tagihan belum lunas.
