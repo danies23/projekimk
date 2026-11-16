@@ -1,5 +1,7 @@
 import type {
   Admisi,
+  AksiAudit,
+  AuditEntry,
   Bed,
   CatatanKlinis,
   Id,
@@ -347,6 +349,26 @@ export function riwayatKlinis(state: State, pasienId: Id): ItemRiwayat[] {
       .map((r): ItemRiwayat => ({ jenis: "resep", waktu: r.waktu, admisiId: r.admisiId, dokter: penulis(r.dokterId), resep: r })),
   ];
   return item.sort((a, b) => b.waktu.localeCompare(a.waktu));
+}
+
+export interface BarisAudit {
+  audit: AuditEntry;
+  pengguna: Pengguna | null;
+}
+
+export interface FilterAudit {
+  penggunaId?: Id;
+  aksi?: AksiAudit;
+}
+
+/** Audit log untuk layar Admin, terbaru dulu; penyaring kosong berarti semua entri. */
+export function daftarAudit(state: State, filter: FilterAudit = {}): BarisAudit[] {
+  return state.audit
+    .filter(
+      (a) => (!filter.penggunaId || a.penggunaId === filter.penggunaId) && (!filter.aksi || a.aksi === filter.aksi),
+    )
+    .sort((a, b) => b.waktu.localeCompare(a.waktu))
+    .map((audit) => ({ audit, pengguna: state.pengguna.find((p) => p.id === audit.penggunaId) ?? null }));
 }
 
 /** Admisi aktif untuk daftar "pasien ini dirawat di mana", terbaru dulu. */

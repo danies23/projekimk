@@ -111,9 +111,12 @@ export default function HalamanKasir() {
             baris={dipilih}
             hariIni={hariIni}
             bolehBayar={boleh(pengguna.peran, "pembayaran.catat")}
+            bolehCheckout={boleh(pengguna.peran, "checkout.lakukan")}
+            bolehOverride={boleh(pengguna.peran, "checkout.override")}
             judulRef={judulDetail}
             onBukaDokumen={setDokumen}
             onCatat={(jumlah, metode) => catatPembayaran(dipilih.tagihanId, jumlah, metode)}
+            onPengumuman={setPengumuman}
           />
         ) : (
           <section className="rounded-lg border border-border bg-surface-muted p-6">
@@ -215,16 +218,22 @@ function DetailTagihan({
   baris,
   hariIni,
   bolehBayar,
+  bolehCheckout,
+  bolehOverride,
   judulRef,
   onBukaDokumen,
   onCatat,
+  onPengumuman,
 }: {
   baris: BarisTagihan;
   hariIni: string;
   bolehBayar: boolean;
+  bolehCheckout: boolean;
+  bolehOverride: boolean;
   judulRef: React.Ref<HTMLHeadingElement>;
   onBukaDokumen: (dokumen: Dokumen) => void;
   onCatat: (jumlah: number, metode: MetodePembayaran) => Hasil;
+  onPengumuman: (pesan: string) => void;
 }) {
   const state = useSelector((s) => s);
   const rincian = rincianTagihan(state, baris.tagihanId, hariIni);
@@ -305,7 +314,203 @@ function DetailTagihan({
         riwayat={riwayat}
         onBukaKuitansi={(pembayaranId) => onBukaDokumen({ jenis: "kuitansi", pembayaranId })}
       />
+
+      <section aria-label="Checkout pasien" className="mt-6">
+        <h3 className="text-small font-semibold text-text">Checkout</h3>
+        <Checkout
+          admisiId={rincian.admisiId}
+          baris={baris}
+          bolehCheckout={bolehCheckout}
+          bolehOverride={bolehOverride}
+          onPengumuman={onPengumuman}
+        />
+      </section>
     </section>
+  );
+}
+
+/**
+ * Checkout hanya dijalankan setelah tagihan lunas. Admin dapat membuka blokir
+ * itu dengan alasan; aturan siapa yang boleh dan alasan wajib tetap di store,
+ * layar hanya menampilkan pesan penolakannya.
+ */
+function Checkout({
+  admisiId,
+  baris,
+  bolehCheckout,
+  bolehOverride,
+  onPengumuman,
+}: {
+  admisiId: Id;
+  baris: BarisTagihan;
+  bolehCheckout: boolean;
+  bolehOverride: boolean;
+  onPengumuman: (pesan: string) => void;
+}) {
+  const store = useStoreDemo();
+  const { pengguna } = useSesi();
+  const state = useSelector((s) => s);
+  const [alasan, setAlasan] = useState("");
+  const [bukaOverride, setBukaOverride] = useState(false);
+  const [galat, setGalat] = useState<string | null>(null);
+  // Panel berubah setelah checkout berhasil; fokus dipindah ke judulnya agar
+  // pengguna keyboard tidak kembali ke awal dokumen (WCAG 2.4.3).
+  const judulCheckout = useRef<HTMLHeadingElement>(null);
+
+  if (!pengguna) return null;
+
+  const admisi = state.admisi.find((a) => a.id === admisiId);
+  const sudahSelesai = baris.statusAdmisi === "selesai";
+  const override = admisi?.overrideCheckout ?? null;
+  const overrideOleh = override ? state.pengguna.find((p) => p.id === override.olehId) : undefined;
+  const belumLunas = baris.nilai.status !== "lunas";
+
+  function jalankan(pakaiOverride: boolean) {
+    const hasil = store.dispatch({
+      type: "checkout",
+      olehId: pengguna!.id,
+      admisiId,
+      override: pakaiOverride ? { alasan } : null,
+    });
+    if (!hasil.ok) {
+      setGalat(hasil.alasan);
+      return;
+    }
+    setGalat(null);
+    setBukaOverride(false);
+    setAlasan("");
+    onPengumuman(
+      pakaiOverride
+        ? `Admisi ${baris.pasien.nama} ditutup dengan override. Alasan tercatat di audit log.`
+        : `Admisi ${baris.pasien.nama} ditutup. Bed ${baris.kodeBed} menunggu dibersihkan.`,
+    );
+    // Setelah re-render, tombol pemicu sudah hilang; arahkan fokus ke judul panel.
+    requestAnimationFrame(() => judulCheckout.current?.focus());
+  }
+
+  // Riwayat administrasi admisi: cara keluar dan, bila lewat override, alasannya.
+  const riwayat = (
+    <dl className="mt-3 grid gap-2 border-t border-border pt-3 text-small">
+      <div className="flex items-baseline justify-between gap-3">
+        <dt className="text-text-muted">Status admisi</dt>
+        <dd className="font-medium text-text">{sudahSelesai ? "Selesai" : "Aktif (masih dirawat)"}</dd>
+      </div>
+      {sudahSelesai ? (
+        <div className="grid gap-1">
+          <dt className="text-text-muted">Checkout</dt>
+          <dd className="text-text">
+            {override ? (
+              <>
+                Lewat override oleh {overrideOleh?.nama ?? "Admin tidak dikenal"}: <span className="font-medium">“{override.alasan}”</span>
+              </>
+            ) : (
+              "Checkout normal setelah tagihan lunas."
+            )}
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  );
+
+  if (!bolehCheckout) {
+    return (
+      <>
+        <p className="mt-2 rounded-md border border-border bg-surface-muted px-3 py-2 text-small text-text-muted">
+          Peran Anda dapat melihat tagihan tetapi tidak melakukan checkout.
+        </p>
+        {riwayat}
+      </>
+    );
+  }
+
+  if (sudahSelesai) {
+    return (
+      <>
+        <h4 ref={judulCheckout} tabIndex={-1} className="sr-only">
+          Status checkout
+        </h4>
+        <p className="mt-2 text-small text-text-muted">
+          Admisi ini sudah ditutup; pasien tidak lagi muncul di daftar admisi aktif.
+        </p>
+        {riwayat}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <h4 ref={judulCheckout} tabIndex={-1} className="sr-only">
+        Status checkout
+      </h4>
+      {belumLunas ? (
+        <p className="mt-2 rounded-md border border-warning px-3 py-2 text-small text-warning">
+          Checkout diblokir karena tagihan belum lunas. Catat pelunasan di kolom pembayaran di atas,
+          atau minta Admin melakukan override dengan alasan.
+        </p>
+      ) : (
+        <p className="mt-2 text-small text-text-muted">
+          Tagihan lunas. Checkout menutup admisi dan mengubah bed menjadi dibersihkan.
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-3">
+        <button type="button" onClick={() => jalankan(false)} disabled={belumLunas} className={`${tombolUtama} disabled:cursor-not-allowed disabled:opacity-60`}>
+          Checkout pasien
+        </button>
+        {/* Override hanya dirender untuk pemegang izinnya; peran lain tidak melihatnya sama sekali. */}
+        {bolehOverride && belumLunas ? (
+          <button type="button" onClick={() => setBukaOverride(!bukaOverride)} className={tombolSekunder}>
+            {bukaOverride ? "Batal override" : "Override checkout"}
+          </button>
+        ) : null}
+      </div>
+
+      {/* Penolakan checkout normal (mis. admisi sudah ditutup di tab lain). */}
+      {galat && !bukaOverride ? (
+        <p role="alert" className="mt-3 rounded-md border border-danger px-3 py-2 text-small text-danger">
+          {galat}
+        </p>
+      ) : null}
+
+      {bolehOverride && belumLunas && bukaOverride ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            jalankan(true);
+          }}
+          className="mt-3 rounded-md border border-border bg-surface-muted p-4"
+        >
+          <label htmlFor="alasan-override" className="block text-small font-medium text-text">
+            Alasan override (wajib)
+          </label>
+          <textarea
+            id="alasan-override"
+            value={alasan}
+            rows={2}
+            onChange={(e) => {
+              setGalat(null);
+              setAlasan(e.target.value);
+            }}
+            aria-invalid={galat ? true : undefined}
+            aria-describedby={galat ? "alasan-override-galat" : "alasan-override-bantuan"}
+            className="mt-1 w-full rounded-md border border-border bg-canvas px-3 py-2 text-body text-text"
+          />
+          {galat ? (
+            <p id="alasan-override-galat" role="alert" className="mt-1 text-caption text-danger">
+              {galat}
+            </p>
+          ) : null}
+          <p id="alasan-override-bantuan" className="mt-1 text-caption text-text-muted">
+            Override menutup admisi meski tagihan belum lunas. Alasan dan nama Admin tercatat di audit log.
+          </p>
+          <button type="submit" className={`mt-3 ${tombolUtama}`}>
+            Checkout dengan override
+          </button>
+        </form>
+      ) : null}
+
+      {riwayat}
+    </>
   );
 }
 
