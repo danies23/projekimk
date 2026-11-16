@@ -73,6 +73,13 @@ export interface ActionPenggunaDibuat {
   input: { id?: Id; nama: string; peran: Peran; aktif?: boolean };
 }
 
+export interface ActionPenggunaDiubah {
+  type: "pengguna/diubah";
+  olehId: Id;
+  penggunaId: Id;
+  perubahan: Partial<{ nama: string; peran: Peran; aktif: boolean }>;
+}
+
 export interface ActionCatatanDitulis {
   type: "catatan/ditulis";
   olehId: Id;
@@ -145,6 +152,12 @@ export interface ActionTindakanDitambahkan {
   tindakanId: Id;
 }
 
+export interface ActionTindakanMasterDibuat {
+  type: "tindakan-master/dibuat";
+  olehId: Id;
+  input: { nama: string; tarif: number };
+}
+
 export interface ActionTindakanMasterDiubah {
   type: "tindakan-master/diubah";
   olehId: Id;
@@ -162,6 +175,7 @@ export type Action =
   | ActionCheckout
   | ActionPembayaranDicatat
   | ActionPenggunaDibuat
+  | ActionPenggunaDiubah
   | ActionCatatanDitulis
   | ActionCatatanDikoreksi
   | ActionInstruksiDijalankan
@@ -171,6 +185,7 @@ export type Action =
   | ActionStokMasuk
   | ActionObatDibuat
   | ActionTindakanDitambahkan
+  | ActionTindakanMasterDibuat
   | ActionTindakanMasterDiubah;
 
 /** Dependensi dari dunia luar (waktu, id). Disuntikkan agar test deterministik. */

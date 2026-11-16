@@ -359,9 +359,14 @@ const pembayaranDicatat: Handler<Extract<Action, { type: "pembayaran/dicatat" }>
 };
 
 const penggunaDibuat: Handler<Extract<Action, { type: "pengguna/dibuat" }>> = (draft, action, deps) => {
+  const nama = action.input.nama.trim();
+  if (!nama) return { ok: false, alasan: "Nama pengguna wajib diisi." };
+  if (action.input.id && draft.pengguna.some((p) => p.id === action.input.id)) {
+    return { ok: false, alasan: "ID pengguna sudah dipakai." };
+  }
   const pengguna = {
     id: action.input.id ?? deps.id("pengguna"),
-    nama: action.input.nama,
+    nama,
     peran: action.input.peran,
     aktif: action.input.aktif ?? true,
   };
@@ -373,6 +378,59 @@ const penggunaDibuat: Handler<Extract<Action, { type: "pengguna/dibuat" }>> = (d
     ringkasan: `Pengguna ${pengguna.nama} (${pengguna.peran}) dibuat.`,
   });
   return { ok: true, id: pengguna.id };
+};
+
+const penggunaDiubah: Handler<Extract<Action, { type: "pengguna/diubah" }>> = (draft, action, deps) => {
+  const pengguna = draft.pengguna.find((p) => p.id === action.penggunaId);
+  if (!pengguna) return { ok: false, alasan: "Pengguna tidak ditemukan." };
+  // Admin yang menonaktifkan dirinya sendiri kehilangan akses ke layar ini;
+  // mengubah peran sendiri juga membuatnya tidak lagi berhak mengelolanya.
+  if (pengguna.id === action.olehId) {
+    return { ok: false, alasan: "Tidak dapat mengubah akun Anda sendiri." };
+  }
+  const nama = action.perubahan.nama === undefined ? pengguna.nama : action.perubahan.nama.trim();
+  if (!nama) return { ok: false, alasan: "Nama pengguna wajib diisi." };
+
+  pengguna.nama = nama;
+  pengguna.peran = action.perubahan.peran ?? pengguna.peran;
+  pengguna.aktif = action.perubahan.aktif ?? pengguna.aktif;
+
+  audit(draft, deps, action.olehId, {
+    aksi: "pengguna.diubah",
+    entitas: "pengguna",
+    entitasId: pengguna.id,
+    ringkasan: `Pengguna ${pengguna.nama} diperbarui (peran ${pengguna.peran}, ${pengguna.aktif ? "aktif" : "nonaktif"}).`,
+  });
+  return { ok: true, id: pengguna.id };
+};
+
+/** Nama tindakan unik tanpa membedakan huruf besar-kecil, seperti master kamar. */
+function namaTindakanValid(draft: State, nama: string, kecualiId?: string): string | null {
+  if (!nama) return "Nama tindakan wajib diisi.";
+  if (draft.tindakanMaster.some((t) => t.id !== kecualiId && t.nama.toLowerCase() === nama.toLowerCase())) {
+    return `Tindakan ${nama} sudah terdaftar.`;
+  }
+  return null;
+}
+
+function tarifValid(tarif: number): string | null {
+  return bulatPositif(tarif) ? null : "Tarif tindakan harus bilangan bulat lebih dari nol.";
+}
+
+const tindakanMasterDibuat: Handler<Extract<Action, { type: "tindakan-master/dibuat" }>> = (draft, action, deps) => {
+  const nama = action.input.nama.trim();
+  const galat = namaTindakanValid(draft, nama) ?? tarifValid(action.input.tarif);
+  if (galat) return { ok: false, alasan: galat };
+
+  const tindakan = { id: deps.id("tindakan-master"), nama, tarif: action.input.tarif, aktif: true };
+  draft.tindakanMaster.push(tindakan);
+  audit(draft, deps, action.olehId, {
+    aksi: "tindakan_master.dibuat",
+    entitas: "tindakan_master",
+    entitasId: tindakan.id,
+    ringkasan: `Tindakan ${tindakan.nama} ditambahkan dengan tarif Rp${tindakan.tarif.toLocaleString("id-ID")}.`,
+  });
+  return { ok: true, id: tindakan.id };
 };
 
 /**
@@ -691,12 +749,24 @@ const tindakanDitambahkan: Handler<Extract<Action, { type: "tindakan/ditambahkan
 const tindakanMasterDiubah: Handler<Extract<Action, { type: "tindakan-master/diubah" }>> = (draft, action, deps) => {
   const master = draft.tindakanMaster.find((t) => t.id === action.tindakanId);
   if (!master) return { ok: false, alasan: "Tindakan tidak ditemukan." };
-  Object.assign(master, action.perubahan);
+  // Hanya kolom yang diubah yang divalidasi: menonaktifkan tindakan lama
+  // dengan nama ganda atau tarif warisan harus tetap bisa dilakukan.
+  const { nama: namaBaru, tarif: tarifBaru } = action.perubahan;
+  const nama = (namaBaru ?? master.nama).trim();
+  const tarif = tarifBaru ?? master.tarif;
+  const galat =
+    (namaBaru === undefined ? null : namaTindakanValid(draft, nama, master.id)) ??
+    (tarifBaru === undefined ? null : tarifValid(tarif));
+  if (galat) return { ok: false, alasan: galat };
+
+  master.nama = nama;
+  master.tarif = tarif;
+  master.aktif = action.perubahan.aktif ?? master.aktif;
   audit(draft, deps, action.olehId, {
     aksi: "tindakan_master.diubah",
     entitas: "tindakan_master",
     entitasId: master.id,
-    ringkasan: `Master tindakan ${master.nama} diperbarui.`,
+    ringkasan: `Master tindakan ${master.nama} diperbarui (tarif Rp${master.tarif.toLocaleString("id-ID")}, ${master.aktif ? "aktif" : "nonaktif"}).`,
   });
   return { ok: true, id: master.id };
 };
@@ -711,6 +781,7 @@ const handlers: { [K in Action["type"]]: Handler<Extract<Action, { type: K }>> }
   checkout,
   "pembayaran/dicatat": pembayaranDicatat,
   "pengguna/dibuat": penggunaDibuat,
+  "pengguna/diubah": penggunaDiubah,
   "catatan/ditulis": catatanDitulis,
   "catatan/dikoreksi": catatanDikoreksi,
   "instruksi/dijalankan": instruksiDijalankan,
@@ -720,6 +791,7 @@ const handlers: { [K in Action["type"]]: Handler<Extract<Action, { type: K }>> }
   "obat/stok-masuk": stokMasuk,
   "obat/dibuat": obatDibuat,
   "tindakan/ditambahkan": tindakanDitambahkan,
+  "tindakan-master/dibuat": tindakanMasterDibuat,
   "tindakan-master/diubah": tindakanMasterDiubah,
 };
 

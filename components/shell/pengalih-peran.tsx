@@ -4,16 +4,23 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { AKUN_DEMO } from "@/lib/domain/demo-accounts";
 import { LABEL_PERAN, URUTAN_PERAN } from "@/lib/label-peran";
 import { useSesi } from "./sesi-provider";
+import { useSelector } from "./store-provider";
 
 /**
  * Pengalih peran cepat, hanya untuk demo. Setiap akun muncul sekali dengan
  * peran sebagai keterangan; saat peran punya dua orang (dokter/perawat), nama
- * membedakan keduanya.
+ * membedakan keduanya. Akun nonaktif tidak ditawarkan: sesi yang menunjuknya
+ * akan langsung dibersihkan dan pengguna terlempar ke halaman login.
  */
 export function PengalihPeran() {
   const { pengguna, masukSebagai } = useSesi();
+  // Matriks akun tetap berasal dari AKUN_DEMO (kredensial tidak hidup di
+  // store), tetapi status aktifnya dibaca dari store agar konsisten dengan
+  // layar Administrasi.
+  const daftarPengguna = useSelector((s) => s.pengguna);
   if (!pengguna) return null;
   const akunAktif = AKUN_DEMO.find((a) => a.id === pengguna.id);
+  const aktif = (id: string) => daftarPengguna.find((p) => p.id === id)?.aktif ?? true;
 
   return (
     <DropdownMenu.Root>
@@ -37,7 +44,7 @@ export function PengalihPeran() {
             Lingkungan demo — berpindah peran tanpa keluar
           </DropdownMenu.Label>
           {URUTAN_PERAN.map((peran) => {
-            const kandidat = AKUN_DEMO.filter((a) => a.peran === peran);
+            const kandidat = AKUN_DEMO.filter((a) => a.peran === peran && aktif(a.id));
             return kandidat.map((a) => (
               <DropdownMenu.Item
                 key={a.id}
