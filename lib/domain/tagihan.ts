@@ -1,5 +1,5 @@
 import { tanggalLokal, lamaInap, selisihHari } from "./lama-inap";
-import type { Admisi, Id, State, StatusTagihan, Tanggal } from "./types";
+import type { Admisi, Id, Pasien, Pembayaran, Pengguna, State, StatusAdmisi, StatusTagihan, Tanggal } from "./types";
 
 /** Stempel waktu dicatat UTC; tanggal kalender harus dibaca di zona pengguna. */
 function tanggalDari(iso: string): Tanggal {
@@ -144,4 +144,78 @@ export function nilaiTagihan(state: State, tagihanId: Id, hariIni: Tanggal): Nil
     .reduce((n, p) => n + p.jumlah, 0);
   const status: StatusTagihan = dibayar === 0 ? "belum bayar" : dibayar >= total ? "lunas" : "sebagian";
   return { total, dibayar, sisa: Math.max(total - dibayar, 0), status };
+}
+
+export interface BarisTagihan {
+  tagihanId: Id;
+  pasien: Pasien;
+  kodeBed: string;
+  namaKamar: string;
+  tanggalMasuk: Tanggal;
+  statusAdmisi: StatusAdmisi;
+  nilai: NilaiTagihan;
+}
+
+/**
+ * Daftar tagihan untuk layar kasir: yang masih berjalan (belum lunas) lebih
+ * dulu, lalu yang terbaru. Tagihan admisi selesai tetap tampil agar sisa
+ * piutang pasien yang sudah pulang masih dapat ditagih.
+ */
+export function daftarTagihan(state: State, hariIni: Tanggal): BarisTagihan[] {
+  const baris = state.tagihan.flatMap((tagihan): BarisTagihan[] => {
+    const admisi = state.admisi.find((a) => a.id === tagihan.admisiId);
+    const pasien = admisi ? state.pasien.find((p) => p.id === admisi.pasienId) : undefined;
+    if (!admisi || !pasien) return [];
+    const bed = state.bed.find((b) => b.id === admisi.bedId);
+    const kamar = bed ? state.kamar.find((k) => k.id === bed.kamarId) : undefined;
+    return [
+      {
+        tagihanId: tagihan.id,
+        pasien,
+        kodeBed: bed?.kode ?? "—",
+        namaKamar: kamar?.nama ?? "—",
+        tanggalMasuk: admisi.tanggalMasuk,
+        statusAdmisi: admisi.status,
+        nilai: nilaiTagihan(state, tagihan.id, hariIni),
+      },
+    ];
+  });
+  const terbuka = (b: BarisTagihan) => (b.nilai.status === "lunas" ? 1 : 0);
+  return baris.sort(
+    (a, b) => terbuka(a) - terbuka(b) || b.tanggalMasuk.localeCompare(a.tanggalMasuk),
+  );
+}
+
+export interface BarisPembayaran {
+  pembayaran: Pembayaran;
+  kasir: Pengguna | null;
+}
+
+/** Riwayat pembayaran satu tagihan, terbaru dulu. */
+export function riwayatPembayaran(state: State, tagihanId: Id): BarisPembayaran[] {
+  return state.pembayaran
+    .filter((p) => p.tagihanId === tagihanId)
+    .sort((a, b) => b.waktu.localeCompare(a.waktu))
+    .map((pembayaran) => ({
+      pembayaran,
+      kasir: state.pengguna.find((p) => p.id === pembayaran.kasirId) ?? null,
+    }));
+}
+
+export interface RingkasanKasir {
+  total: number;
+  transaksi: number;
+  hariIni: number;
+}
+
+/** Uang yang diterima satu kasir: seluruhnya, jumlah transaksi, dan bagian hari ini. */
+export function ringkasanKasir(state: State, kasirId: Id, hariIni: Tanggal): RingkasanKasir {
+  const milik = state.pembayaran.filter((p) => p.kasirId === kasirId);
+  return {
+    total: milik.reduce((n, p) => n + p.jumlah, 0),
+    transaksi: milik.length,
+    hariIni: milik
+      .filter((p) => tanggalDari(p.waktu) === hariIni)
+      .reduce((n, p) => n + p.jumlah, 0),
+  };
 }
