@@ -50,6 +50,11 @@ const HARAPAN: Array<{ peran: string; rute: string; teks: RegExp }> = [
   // Tabel pengguna tidak termasuk — ia selalu berisi pengguna yang sedang masuk.
   { peran: "Sari Dewanti", rute: "/kamar", teks: /Belum ada kamar pada master\. Tambahkan kamar/i },
   { peran: "Sari Dewanti", rute: "/farmasi", teks: /Belum ada obat pada master\. Tambahkan obat/i },
+  {
+    peran: "Sari Dewanti",
+    rute: "/administrasi",
+    teks: /Belum ada tindakan pada master\. Tambahkan tindakan/i,
+  },
 ];
 
 for (const { peran, rute, teks } of HARAPAN) {

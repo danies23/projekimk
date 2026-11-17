@@ -24,7 +24,7 @@
 ## Comments
 
 - 2026-11-17: Audit dikerjakan dengan mengukur DOM yang benar-benar dirender, bukan dengan
-  membaca token. Tujuh berkas E2E baru (114 skenario) ditambahkan; `README.md` menjelaskan perannya.
+  membaca token. Tujuh berkas E2E baru (125 skenario) ditambahkan; `README.md` menjelaskan perannya.
   Rute per peran di test diturunkan dari matriks izin `lib/domain/izin.ts`, bukan daftar kedua.
 
   **Tiga bug nyata ditemukan dan diperbaiki.** Audit target 44×44 memerahkan sebagian rute:
@@ -43,22 +43,31 @@
   obat, tindakan) juga tidak punya kondisi kosong sama sekali; kini masing-masing menjelaskan cara
   mengisinya. Tabel pengguna dikecualikan: ia selalu berisi pengguna yang sedang masuk.
 
+  **Status tanpa warna:** setiap keluarga status dibaca sebagai teks — bed (terisi/kosong/
+  dibersihkan), tagihan, resep, admisi, pengguna aktif, dan stok menipis. Dibaca dari teksnya,
+  bukan dari kelas CSS, sesuai keputusan pengujian di spec.
+
   **Kontras:** axe melewati teks SVG dengan alasan "latar tidak dapat ditentukan", padahal seluruh
   label grafik dashboard berukuran 11 px. `kontrasTakTerukur` di `tests/e2e/bantuan.ts` mengukur
   sendiri teks SVG dengan rumus WCAG yang sama; tidak ada yang di bawah 4.5:1. Login dan sistem
   desain juga ikut diaudit — keduanya di luar matriks peran.
 
-  **Klik ganda:** tujuh aksi yang menambah baris (admisi, pembayaran, catatan klinis, tindakan,
-  obat, pengguna, kamar) diuji dengan Enter dua kali berurutan pada tombol yang sama. Semua
-  bertambah tepat satu. Dua klik di dalam satu tick JavaScript memang tercatat dua kali, tetapi
-  peramban tidak dapat menghasilkannya dari pengguna; `dblclick` dan dua Enter sungguhan pada
-  kasir dan klinis masing-masing tercatat satu. Tidak ada indikator loading yang ditambahkan karena
-  `dispatch` bersifat sinkron dan tidak ada panggilan jaringan saat runtime (ADR-0001).
+  **Target 44×44:** diukur pada setiap rute diam *dan* pada keadaan yang hanya muncul setelah
+  interaksi (langkah 2 wizard dan tagihan yang dibuka), karena rute diam saja tidak pernah
+  merender kedua keadaan itu.
 
-  **Keyboard:** kedua alur diselesaikan dengan Tab, Enter, Space, panah, dan pengetikan saja.
-  Dua hal yang hanya terlihat dari test ini: setelah pasien tersimpan, tombol "Lanjut ke langkah 2"
-  berada di atas daftar admisi sehingga pengguna keyboard mencapainya dengan Shift+Tab; dan radio
-  metode pembayaran berbagi satu titik Tab, jadi antar-metode berpindah dengan panah.
+  **Klik ganda:** tujuh aksi yang menambah baris (admisi, pembayaran, catatan klinis, tindakan,
+  obat, pengguna, kamar) diuji dengan Enter dua kali berurutan pada tombol yang sama; semua
+  bertambah tepat satu. Dua klik di dalam satu tick JavaScript memang tercatat dua kali, tetapi
+  peramban tidak dapat menghasilkannya dari pengguna. Tidak ada indikator loading yang ditambahkan
+  karena `dispatch` bersifat sinkron dan tidak ada panggilan jaringan saat runtime (ADR-0001).
+
+  **Keyboard:** kedua alur diselesaikan dengan Tab, Enter, Space, panah, dan pengetikan saja —
+  tidak ada klik sama sekali. Satu hal yang hanya terlihat dari test ini: setelah pasien tersimpan,
+  tombol "Lanjut ke langkah 2" berada di atas daftar admisi aktif, sementara fokus masih di tombol
+  simpan yang mendahuluinya; Tab maju menyusuri daftar dulu lalu kembali ke atas dokumen dan sampai
+  juga (11 Tab). Radio metode pembayaran berbagi satu titik Tab, jadi antar-metode berpindah dengan
+  panah.
 
   **Yang sudah benar tanpa perubahan** (dibuktikan test, bukan diasumsikan): kedua dialog
   memindahkan fokus ke dalam dan mengembalikannya ke pemicu; halaman 1024×768 tidak melebar
@@ -73,7 +82,15 @@
   kriteria "tidak ada halaman error" lebih jujur bila alamat salah pun menjelaskan dirinya, jadi
   `app/not-found.tsx` ditambahkan — lolos axe tanpa pelanggaran dan targetnya ≥44 px.
 
+  **Test tidak stabil, dan sebabnya nyata.** Suite penuh gagal sekitar 1 dari 4 kali pada
+  `next dev`: `masukSebagai` mengklik pemilih akun sebelum React selesai hidrasi, kliknya tidak
+  melakukan apa pun, dan test masuk sebagai akun bawaan tanpa menyadarinya — lalu gagal jauh di
+  belakang dengan pesan yang menyesatkan. Helper kini memeriksa kolom email sesudah klik, jadi
+  keterlambatan hidrasi menjadi kegagalan yang terlihat. Bukti: `next dev`, empat kali berturut-turut,
+  216/216. (Run sebelumnya: 1 gagal, 216 lulus, tiga kali.) Flake ini sudah ada sebelum ticket ini —
+  `masukSebagai` dipakai semua berkas lama.
+
   Verifikasi akhir: `npx tsc --noEmit`, `npx eslint .`, `npx vitest run` (296 test), dan
-  `npx playwright test` semuanya hijau; `npm run build` menghasilkan 15 rute statis.
+  `npx playwright test` (216 skenario) semuanya hijau; `npm run build` menghasilkan 15 rute statis.
   Zip diuji dengan cara diekstrak ke direktori kosong, `npm ci`, lalu seluruh perintah di README.
 

@@ -13,14 +13,19 @@ import { masukSebagai } from "./bantuan";
  * bagian akhir sengaja memakai klik: yang diuji justru tombolnya.
  */
 
-/** Tab sampai elemen yang cocok menerima fokus; gagal bila tidak ketemu. */
+/**
+ * Tab sampai elemen yang cocok menerima fokus; gagal bila tidak ketemu.
+ * Hanya elemen yang benar-benar dapat difokuskan yang dibandingkan: `BODY`
+ * dikembalikan peramban saat Tab melewati akhir dokumen, dan `textContent`-nya
+ * memuat seluruh teks halaman sehingga selalu cocok.
+ */
 async function tabKe(page: Page, label: string | RegExp, batas = 60) {
   const pola = typeof label === "string" ? label : label.source;
   for (let i = 0; i < batas; i++) {
     await page.keyboard.press("Tab");
     const cocok = await page.evaluate((sumber) => {
-      const aktif = document.activeElement;
-      if (!aktif) return false;
+      const aktif = document.activeElement as HTMLElement | null;
+      if (!aktif || aktif === document.body) return false;
       // Radio dan checkbox dibungkus label-nya, bukan dihubungkan lewat `id`.
       const labelPembungkus = aktif.closest("label")?.textContent ?? "";
       const teks = [
@@ -64,7 +69,6 @@ test("urutan Tab menyusuri header, sidebar, lalu isi halaman", async ({ page }) 
   await expect(page.getByRole("heading", { level: 1, name: "Pendaftaran pasien" })).toBeVisible();
   // Mulai dari awal dokumen, bukan dari elemen yang difokuskan test.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.locator("body").click({ position: { x: 1, y: 1 } });
 
   const jejak = await jejakTab(page, 14);
   const menu = ["Dashboard", "Pendaftaran", "Kamar & Bed"];
@@ -84,7 +88,6 @@ test("alur pendaftaran selesai sepenuhnya dengan keyboard", async ({ page }) => 
   // Langkah 1: seluruh kolom dicapai dengan Tab, mulai dari kata kunci
   // pencarian. Nama pasien baru belum terdaftar, jadi hasil pencarian kosong.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.locator("body").click({ position: { x: 1, y: 1 } });
   await tabKe(page, /Kata kunci pencarian/);
   await page.keyboard.type("Pasien Keyboard");
   await tabKe(page, /Nama pasien/);
@@ -111,11 +114,10 @@ test("alur pendaftaran selesai sepenuhnya dengan keyboard", async ({ page }) => 
   await page.keyboard.press("Enter");
   await expect(page.getByText("Pasien tersimpan.")).toBeVisible();
 
-  // Setelah pasien tersimpan, tombol lanjut muncul di atas daftar admisi aktif;
-  // fokus keyboard masih berada di tombol simpan, jadi Tab berikutnya memang
-  // menyusuri daftar. Pengguna keyboard mencapainya dengan Shift+Tab.
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.locator("body").click({ position: { x: 1, y: 1 } });
+  // Setelah tersimpan, tombol lanjut muncul di atas daftar admisi aktif. Tab
+  // maju menyusuri daftar lebih dulu, lalu kembali ke atas dokumen dan sampai
+  // juga — tanpa mouse, meski jarak tempuhnya panjang (bergantung jumlah
+  // admisi pada data demo, jadi jangan dibatasi ketat).
   await tabKe(page, /Lanjut ke langkah 2/);
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { level: 2, name: /Dokter, tanggal masuk, dan bed/ })).toBeFocused();
@@ -230,10 +232,22 @@ async function klikGanda(page: Page, label: string) {
  * tombol yang sama — bentuk klik ganda yang benar-benar bisa dilakukan
  * pengguna. Yang harus terbukti: bertambah tepat satu.
  */
-const AKSI_GANDA: Array<{ nama: string; koleksi: string; siapkan: (page: Page) => Promise<void>; tombol: string }> = [
+interface UjiKlikGanda {
+  nama: string;
+  /** Koleksi snapshot yang harus bertambah tepat satu. */
+  koleksi: string;
+  peran: string;
+  rute: string;
+  siapkan: (page: Page) => Promise<void>;
+  tombol: string;
+}
+
+const AKSI_GANDA: UjiKlikGanda[] = [
   {
     nama: "admisi",
     koleksi: "admisi",
+    peran: "Rina Kartika",
+    rute: "/pendaftaran",
     siapkan: async (page) => {
       await page.getByLabel("Kata kunci pencarian").fill("Siti");
       await page.getByRole("region", { name: "Cari pasien lama" }).getByRole("button", { name: /Siti Rahmawati/ }).click();
@@ -245,6 +259,8 @@ const AKSI_GANDA: Array<{ nama: string; koleksi: string; siapkan: (page: Page) =
   },
   {
     nama: "pembayaran",
+    peran: "Joko Susilo",
+    rute: "/kasir",
     koleksi: "pembayaran",
     siapkan: async (page) => {
       await page.getByRole("region", { name: "Daftar tagihan" }).getByRole("button").first().click();
@@ -254,6 +270,8 @@ const AKSI_GANDA: Array<{ nama: string; koleksi: string; siapkan: (page: Page) =
   },
   {
     nama: "catatan klinis",
+    peran: "dr. Ayu Prameswari",
+    rute: "/klinis",
     koleksi: "catatanKlinis",
     siapkan: async (page) => {
       await page.getByRole("region", { name: "Pasien saya" }).getByRole("button").first().click();
@@ -265,6 +283,8 @@ const AKSI_GANDA: Array<{ nama: string; koleksi: string; siapkan: (page: Page) =
   },
   {
     nama: "tindakan admisi",
+    peran: "dr. Ayu Prameswari",
+    rute: "/klinis",
     koleksi: "tindakanAdmisi",
     siapkan: async (page) => {
       await page.getByRole("region", { name: "Pasien saya" }).getByRole("button").first().click();
@@ -274,6 +294,8 @@ const AKSI_GANDA: Array<{ nama: string; koleksi: string; siapkan: (page: Page) =
   },
   {
     nama: "obat",
+    peran: "Nadia Rahmania",
+    rute: "/farmasi",
     koleksi: "obat",
     siapkan: async (page) => {
       await page.getByLabel("Nama obat").fill("Obat Uji Ganda");
@@ -286,6 +308,8 @@ const AKSI_GANDA: Array<{ nama: string; koleksi: string; siapkan: (page: Page) =
   },
   {
     nama: "pengguna",
+    peran: "Sari Dewanti",
+    rute: "/administrasi",
     koleksi: "pengguna",
     siapkan: async (page) => {
       await page.getByLabel("Nama lengkap").last().fill("Pengguna Uji Ganda");
@@ -294,6 +318,8 @@ const AKSI_GANDA: Array<{ nama: string; koleksi: string; siapkan: (page: Page) =
   },
   {
     nama: "kamar",
+    peran: "Sari Dewanti",
+    rute: "/kamar",
     koleksi: "kamar",
     siapkan: async (page) => {
       await page.getByLabel("Nama kamar").fill("Kamar Uji Ganda");
@@ -304,29 +330,18 @@ const AKSI_GANDA: Array<{ nama: string; koleksi: string; siapkan: (page: Page) =
   },
 ];
 
-const RUTE_AKSI: Record<string, { peran: string; rute: string }> = {
-  admisi: { peran: "Rina Kartika", rute: "/pendaftaran" },
-  pembayaran: { peran: "Joko Susilo", rute: "/kasir" },
-  "catatan klinis": { peran: "dr. Ayu Prameswari", rute: "/klinis" },
-  "tindakan admisi": { peran: "dr. Ayu Prameswari", rute: "/klinis" },
-  obat: { peran: "Nadia Rahmania", rute: "/farmasi" },
-  pengguna: { peran: "Sari Dewanti", rute: "/administrasi" },
-  kamar: { peran: "Sari Dewanti", rute: "/kamar" },
-};
-
 for (const aksi of AKSI_GANDA) {
   test(`klik ganda pada ${aksi.nama} tidak tercatat dua kali`, async ({ page }) => {
-    const { peran, rute } = RUTE_AKSI[aksi.nama]!;
-    await masukSebagai(page, peran);
-    await page.goto(rute);
+    await masukSebagai(page, aksi.peran);
+    await page.goto(aksi.rute);
     await aksi.siapkan(page);
 
     const sebelum = await hitung(page, aksi.koleksi);
     await klikGanda(page, aksi.tombol);
-    await expect(page.getByRole("main")).toBeVisible();
-    // Beri React satu putaran untuk menulis snapshot sebelum dihitung.
-    await page.waitForTimeout(200);
-
-    expect((await hitung(page, aksi.koleksi)) - sebelum, `klik ganda pada ${aksi.tombol}`).toBe(1);
+    // Snapshot ditulis oleh subscriber store; tunggu sampai jumlahnya bergerak
+    // ketimbang menebak lama render.
+    await expect
+      .poll(async () => (await hitung(page, aksi.koleksi)) - sebelum, { message: `klik ganda pada ${aksi.tombol}` })
+      .toBe(1);
   });
 }

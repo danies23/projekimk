@@ -4,10 +4,21 @@ import path from "node:path";
 import { AKUN_DEMO } from "../../lib/domain/demo-accounts";
 import { menuUntuk } from "../../lib/domain/izin";
 
-/** Masuk lewat halaman login dengan akun demo yang namanya cocok. */
+/**
+ * Masuk lewat halaman login dengan akun demo yang namanya cocok.
+ *
+ * Klik pemilih akun hanya bekerja setelah React menyelesaikan hidrasi; pada
+ * `next dev` HTML awal terkirim lebih dulu, dan klik yang mendarat terlalu
+ * cepat tidak mengisi apa pun — pengguna lalu masuk sebagai akun bawaan tanpa
+ * test menyadarinya. Nilai kolom email diperiksa sesudah klik, sehingga
+ * keterlambatan hidrasi menjadi kegagalan yang terlihat, bukan akun yang salah.
+ */
 export async function masukSebagai(page: Page, nama: string) {
+  const akun = AKUN_DEMO.find((a) => a.nama.includes(nama));
+  if (!akun) throw new Error(`akun demo "${nama}" tidak ada`);
   await page.goto("/login");
   await page.getByRole("button", { name: new RegExp(nama) }).click();
+  await expect(page.getByLabel("Email")).toHaveValue(akun.email);
   await page.getByRole("button", { name: "Masuk" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 }
@@ -86,7 +97,8 @@ export async function kontrasTakTerukur(page: Page): Promise<string[]> {
       const rasio = (Math.max(a!, b!) + 0.05) / (Math.min(a!, b!) + 0.05);
       return rasio < 4.5 ? `${teks}: ${rasio.toFixed(2)}:1` : null;
     };
-    // Teks SVG seluruhnya; axe tidak membaca latar SVG sama sekali.
+    // Label sumbu dan keterangan di dalam <svg> pada area konten. Wordmark
+    // header adalah logo, bukan teks isi, jadi tidak ikut diukur.
     const kandidat = [...document.querySelectorAll("main svg text")];
     return kandidat.map(periksa).filter((x): x is string => x !== null);
   });
