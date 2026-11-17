@@ -46,6 +46,10 @@ const HARAPAN: Array<{ peran: string; rute: string; teks: RegExp }> = [
     teks: /Belum ada aktivitas tercatat\. Entri muncul setelah data demo diubah/i,
   },
   { peran: "Hendra Wijaya", rute: "/laporan", teks: /Coba lebarkan rentang tanggal atau pilih bulan lain/i },
+  // Master data: tabel yang kosong pun harus menjelaskan cara mengisinya.
+  // Tabel pengguna tidak termasuk — ia selalu berisi pengguna yang sedang masuk.
+  { peran: "Sari Dewanti", rute: "/kamar", teks: /Belum ada kamar pada master\. Tambahkan kamar/i },
+  { peran: "Sari Dewanti", rute: "/farmasi", teks: /Belum ada obat pada master\. Tambahkan obat/i },
 ];
 
 for (const { peran, rute, teks } of HARAPAN) {

@@ -308,6 +308,14 @@ function BagianTindakan({
             </tr>
           </thead>
           <tbody>
+            {tindakan.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-small text-text-muted">
+                  Belum ada tindakan pada master. Tambahkan tindakan pada formulir di bawah agar
+                  dokter dapat memilihnya.
+                </td>
+              </tr>
+            ) : null}
             {tindakan.map((t) => (
               <tr key={t.id} className="border-b border-border last:border-b-0">
                 <th scope="row" className="px-4 py-3 text-left font-medium text-text">{t.nama}</th>

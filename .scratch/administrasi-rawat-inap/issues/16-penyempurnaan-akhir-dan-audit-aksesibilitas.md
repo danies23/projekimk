@@ -39,19 +39,30 @@
 
   **Kondisi kosong:** kalimat penjelas diperiksa sebagai kalimat lengkap, bukan pola longgar.
   Pemeriksaan itu menemukan satu kondisi kosong yang hanya menyebut "tidak ada data" tanpa langkah
-  berikutnya — kelompok resep di Farmasi — dan kalimatnya dilengkapi.
+  berikutnya — kelompok resep di Farmasi — dan kalimatnya dilengkapi. Tiga tabel master (kamar,
+  obat, tindakan) juga tidak punya kondisi kosong sama sekali; kini masing-masing menjelaskan cara
+  mengisinya. Tabel pengguna dikecualikan: ia selalu berisi pengguna yang sedang masuk.
 
-  **Yang sudah benar tanpa perubahan** (dibuktikan test, bukan diasumsikan): kontras diukur axe
-  pada 1.043 node di halaman audit dan lulus tanpa pelanggaran; alur pendaftaran dan pembayaran
-  selesai dengan Tab/Enter/Space saja; kedua dialog memindahkan fokus ke dalam dan mengembalikannya
-  ke pemicu; halaman 1024×768 tidak melebar horizontal; seluruh rute berisi dan tidak ada tautan
-  mati.
+  **Kontras:** axe melewati teks SVG dengan alasan "latar tidak dapat ditentukan", padahal seluruh
+  label grafik dashboard berukuran 11 px. `kontrasTakTerukur` di `tests/e2e/bantuan.ts` mengukur
+  sendiri teks SVG dengan rumus WCAG yang sama; tidak ada yang di bawah 4.5:1. Login dan sistem
+  desain juga ikut diaudit — keduanya di luar matriks peran.
 
-  **Klik ganda:** dashboard, kasir, klinis, farmasi, kamar, dan administrasi masing-masing diuji
-  dengan dua klik dalam satu tick, `dblclick()`, dan dua Enter berurutan. Tidak ada yang tercatat
-  dua kali — store adalah penjaga terakhir. Tidak ada indikator loading yang ditambahkan karena
-  `dispatch` bersifat sinkron dan tidak ada panggilan jaringan saat runtime (ADR-0001); indikator
-  untuk aksi nol-detik hanya akan berkedip tanpa memberi informasi.
+  **Klik ganda:** tujuh aksi yang menambah baris (admisi, pembayaran, catatan klinis, tindakan,
+  obat, pengguna, kamar) diuji dengan Enter dua kali berurutan pada tombol yang sama. Semua
+  bertambah tepat satu. Dua klik di dalam satu tick JavaScript memang tercatat dua kali, tetapi
+  peramban tidak dapat menghasilkannya dari pengguna; `dblclick` dan dua Enter sungguhan pada
+  kasir dan klinis masing-masing tercatat satu. Tidak ada indikator loading yang ditambahkan karena
+  `dispatch` bersifat sinkron dan tidak ada panggilan jaringan saat runtime (ADR-0001).
+
+  **Keyboard:** kedua alur diselesaikan dengan Tab, Enter, Space, panah, dan pengetikan saja.
+  Dua hal yang hanya terlihat dari test ini: setelah pasien tersimpan, tombol "Lanjut ke langkah 2"
+  berada di atas daftar admisi sehingga pengguna keyboard mencapainya dengan Shift+Tab; dan radio
+  metode pembayaran berbagi satu titik Tab, jadi antar-metode berpindah dengan panah.
+
+  **Yang sudah benar tanpa perubahan** (dibuktikan test, bukan diasumsikan): kedua dialog
+  memindahkan fokus ke dalam dan mengembalikannya ke pemicu; halaman 1024×768 tidak melebar
+  horizontal; seluruh rute berisi dan tidak ada tautan mati.
 
   **Deploy:** URL demo di README ternyata **404 pada `/login` dan `/dashboard`** — deployment
   terakhir 13 November, sebelum ticket 14 dan 15. Repo ditautkan ke proyek `dani-medical-center`
@@ -63,6 +74,6 @@
   `app/not-found.tsx` ditambahkan — lolos axe tanpa pelanggaran dan targetnya ≥44 px.
 
   Verifikasi akhir: `npx tsc --noEmit`, `npx eslint .`, `npx vitest run` (296 test), dan
-  `npx playwright test` (177 skenario) semuanya hijau; `npm run build` menghasilkan 15 rute statis.
+  `npx playwright test` semuanya hijau; `npm run build` menghasilkan 15 rute statis.
   Zip diuji dengan cara diekstrak ke direktori kosong, `npm ci`, lalu seluruh perintah di README.
 

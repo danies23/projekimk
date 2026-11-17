@@ -338,6 +338,14 @@ function MasterKamar({
             </tr>
           </thead>
           <tbody>
+            {kamar.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-6 text-small text-text-muted">
+                  Belum ada kamar pada master. Tambahkan kamar pada formulir di bawah agar bed dapat
+                  dialokasikan saat pendaftaran.
+                </td>
+              </tr>
+            ) : null}
             {kamar.map((k) => (
               <tr key={k.kamar.id} className="border-b border-border last:border-b-0">
                 <th scope="row" className="px-4 py-3 text-left font-medium text-text">{k.kamar.nama}</th>

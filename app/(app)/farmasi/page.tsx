@@ -444,6 +444,14 @@ function MasterObat({
             </tr>
           </thead>
           <tbody>
+            {state.obat.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-small text-text-muted">
+                  Belum ada obat pada master. Tambahkan obat pada formulir di bawah agar dapat
+                  diresepkan dokter.
+                </td>
+              </tr>
+            ) : null}
             {state.obat.map((o) => {
               const stokMenipis = menipis.has(o.id);
               return (
