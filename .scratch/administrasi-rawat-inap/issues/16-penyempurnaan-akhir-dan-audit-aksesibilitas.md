@@ -51,6 +51,12 @@
   terakhir 13 November, sebelum ticket 14 dan 15. Repo ditautkan ke proyek `dani-medical-center`
   dan di-deploy ulang; seluruh rute kini 200 dan login diverifikasi di peramban terhadap URL publik.
 
+  **Halaman tidak ditemukan:** alamat yang salah ketik semula jatuh ke halaman error bawaan
+  Next.js (404 polos tanpa logomark). Tidak ada tautan aplikasi yang menunjuk ke sana, tetapi
+  kriteria "tidak ada halaman error" lebih jujur bila alamat salah pun menjelaskan dirinya, jadi
+  `app/not-found.tsx` ditambahkan — lolos axe tanpa pelanggaran dan targetnya ≥44 px.
+
   Verifikasi akhir: `npx tsc --noEmit`, `npx eslint .`, `npx vitest run` (296 test), dan
-  `npx playwright test` (176 skenario) semuanya hijau; `npm run build` menghasilkan 15 rute statis.
+  `npx playwright test` (177 skenario) semuanya hijau; `npm run build` menghasilkan 15 rute statis.
+  Zip diuji dengan cara diekstrak ke direktori kosong, `npm ci`, lalu seluruh perintah di README.
 
