@@ -39,17 +39,16 @@ export function GrafikTrenPendapatan({ tren }: { tren: TitikPendapatan[] }) {
   const titik = tren.map((t, i) => `${x(i)},${y(t.jumlah)}`).join(" ");
   const area = `M ${x(0)},${garisDasar} L ${tren.map((t, i) => `${x(i)},${y(t.jumlah)}`).join(" L ")} L ${x(tren.length - 1)},${garisDasar} Z`;
 
-  // Rata-rata hanya mulai setelah jendelanya penuh; jendela separuh di ujung
-  // kiri akan jatuh ke nol dan tampak seperti penurunan yang tidak terjadi.
+  // Jendela yang belum penuh di awal dihitung dari hari yang ada saja, bukan
+  // dianggap nol: membagi dengan 7 saat baru 2 hari terisi membuat garis
+  // rata-rata terjun ke bawah lalu naik lagi — penurunan yang tidak pernah
+  // terjadi. Dengan pembagi sebenarnya, garis mulai tepat di titik pertama dan
+  // menjadi rata-rata 7 hari penuh pada hari ketujuh.
   const rataRata = tren.map((_, i) => {
-    if (i < JENDELA - 1) return null;
-    const jendela = tren.slice(i - JENDELA + 1, i + 1);
+    const jendela = tren.slice(Math.max(0, i - JENDELA + 1), i + 1);
     return jendela.reduce((n, t) => n + t.jumlah, 0) / jendela.length;
   });
-  const titikRataRata = rataRata
-    .map((n, i) => (n === null ? null : `${x(i)},${y(n)}`))
-    .filter(Boolean)
-    .join(" ");
+  const titikRataRata = rataRata.map((n, i) => `${x(i)},${y(n)}`).join(" ");
 
   const hariIni = tren.length - 1;
   const labelY = [
@@ -99,7 +98,6 @@ export function GrafikTrenPendapatan({ tren }: { tren: TitikPendapatan[] }) {
             strokeLinecap="round"
           />
         ) : null}
-
         {tren.map((t, i) => (
           <circle key={t.tanggal} cx={x(i)} cy={y(t.jumlah)} r={i === hariIni ? 4 : 2} fill="var(--color-primary)">
             <title>
