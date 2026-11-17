@@ -30,6 +30,38 @@ Test E2E memakai Chromium. Sekali saja setelah clone:
 npx playwright install chromium
 ```
 
+Playwright menjalankan `next dev` sendiri pada port 3100, jadi tidak perlu
+menyalakan server pengembangan secara terpisah.
+
+## Menjalankan ulang dari kondisi bersih
+
+Zip proyek berisi berkas yang dilacak git — tanpa `node_modules`, `.next`, dan
+`.env.local`. Ekstrak ke direktori kosong, lalu:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run typecheck && npm run lint && npm test && npm run test:e2e
+```
+
+Perintah yang sama dipakai untuk memeriksa zip sebelum dikumpulkan.
+
+## Aksesibilitas
+
+Prototipe mengikuti WCAG 2.1 AA dan diperiksa otomatis, bukan hanya oleh token:
+
+| Berkas | Yang dijaga |
+|---|---|
+| `lib/design-tokens.test.ts` | kontras setiap pasangan warna yang dideklarasikan |
+| `tests/e2e/aksesibilitas.spec.ts` | audit axe pada 23 rute per peran |
+| `tests/e2e/aksesibilitas-interaktif.spec.ts` | audit axe pada dialog dan formulir yang sedang terbuka |
+| `tests/e2e/ukuran-target-dan-tablet.spec.ts` | target interaktif ≥44×44 px dan tablet 1024×768 tanpa scroll horizontal |
+| `tests/e2e/interaksi-keyboard.spec.ts` | alur pendaftaran dan pembayaran selesai tanpa mouse; fokus dialog |
+| `tests/e2e/kualitas-layar.spec.ts` | tidak ada layar kosong, status terbaca tanpa warna, istilah asing |
+| `tests/e2e/kondisi-kosong.spec.ts` | setiap daftar dan laporan punya kondisi kosong yang menjelaskan |
+
+Kegagalan audit axe menyebutkan rute, aturan, dan elemen yang bermasalah.
+
 ## Susunan
 
 ```

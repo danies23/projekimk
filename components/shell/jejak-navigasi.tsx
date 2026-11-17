@@ -23,7 +23,7 @@ export function JejakNavigasi() {
                 </span>
               ) : (
                 <>
-                  <Link href={modul.href} className="rounded-sm hover:text-primary hover:underline">
+                  <Link href={modul.href} className="inline-flex min-h-11 items-center rounded-sm hover:text-primary hover:underline">
                     {modul.label}
                   </Link>
                   <span aria-hidden="true">/</span>

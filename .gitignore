@@ -39,3 +39,9 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+.vercel
+.env*
+
+# hasil pengemasan untuk dikumpulkan
+*.zip
