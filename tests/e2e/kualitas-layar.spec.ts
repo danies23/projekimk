@@ -1,24 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
-import { masukSebagai } from "./bantuan";
+import { RUTE_PER_PERAN, masukSebagai } from "./bantuan";
 
 /**
  * Kriteria ticket yang tidak tertangkap audit axe: tidak ada rute atau tombol
  * yang membawa ke layar kosong atau halaman error, setiap status terbaca tanpa
- * warna, dan seluruh teks antarmuka berbahasa Indonesia.
+ * warna, dan seluruh teks antarmuka memakai istilah sesuai GLOSSARY.md.
  */
-
-const RUTE: Array<{ peran: string; rute: string[] }> = [
-  { peran: "Rina Kartika", rute: ["/dashboard", "/pendaftaran", "/kamar"] },
-  { peran: "dr. Ayu Prameswari", rute: ["/dashboard", "/klinis"] },
-  { peran: "Ns. Dwi Lestari", rute: ["/dashboard", "/klinis", "/kamar"] },
-  { peran: "Nadia Rahmania", rute: ["/dashboard", "/farmasi", "/laporan"] },
-  { peran: "Joko Susilo", rute: ["/dashboard", "/kasir", "/laporan"] },
-  { peran: "Hendra Wijaya", rute: ["/dashboard", "/laporan"] },
-  {
-    peran: "Sari Dewanti",
-    rute: ["/dashboard", "/kamar", "/farmasi", "/kasir", "/laporan", "/administrasi", "/administrasi/audit"],
-  },
-];
 
 /** Teks yang terlihat di layar, tanpa isi elemen tersembunyi. */
 async function teksTerlihat(page: Page): Promise<string> {
@@ -36,14 +23,14 @@ async function teksTerlihat(page: Page): Promise<string> {
   });
 }
 
-for (const { peran, rute } of RUTE) {
+for (const { nama, rute } of RUTE_PER_PERAN) {
   for (const r of rute) {
-    test(`${peran} — ${r}: tidak kosong dan tanpa halaman error`, async ({ page }) => {
-      await masukSebagai(page, peran);
+    test(`${nama} — ${r}: tidak kosong dan tanpa halaman error`, async ({ page }) => {
+      await masukSebagai(page, nama);
       await page.goto(r);
 
       await expect(page.getByRole("main")).toBeVisible();
-      // Halaman error Next.js memasang tombol "Try again" / teks "Application error".
+      // Halaman error Next.js memasang teks dan tombol percobaan ulang.
       await expect(page.locator("body")).not.toContainText(/Application error|Internal Server Error/i);
       expect((await teksTerlihat(page)).length, `isi ${r} kosong`).toBeGreaterThan(40);
     });
@@ -59,8 +46,7 @@ test("setiap tautan sidebar membuka halaman berisi, bukan layar kosong", async (
     await page.goto(href!);
     await expect(page.getByRole("main")).toBeVisible();
     expect((await teksTerlihat(page)).length, `isi ${href} kosong`).toBeGreaterThan(40);
-    // Rute yang ditolak tetap menjelaskan sebabnya, bukan halaman kosong.
-    await expect(page.getByRole("main")).not.toContainText(/404|This page could not be found/i);
+    await expect(page.getByRole("main")).not.toContainText(/Halaman tidak ditemukan|This page could not be found/i);
   }
 });
 
@@ -87,25 +73,54 @@ test("status bed dan tagihan selalu disertai teks, bukan hanya warna", async ({ 
   }
 });
 
-test("teks antarmuka berbahasa Indonesia tanpa istilah Inggris yang terlarang", async ({ page }) => {
-  await masukSebagai(page, "Sari Dewanti");
-  // Istilah Inggris yang lazim bocor pada prototipe, plus istilah yang
-  // dilarang GLOSSARY.md.
-  const terlarang = /\b(submit|cancel|save|delete|edit|loading|search here|no data|not found|dashboard only|patient|invoice|discharge|assign|booking|reservation|seed|fixture|dummy)\b/i;
+/**
+ * Istilah Inggris yang lazim bocor pada prototipe, ditambah setiap istilah
+ * "Avoid" pada GLOSSARY.md. Daftar ini sengaja mengambil istilah dari glossary
+ * apa adanya, supaya kosakata yang dilarang tidak dirawat di dua tempat.
+ */
+const TERLARANG = new RegExp(
+  [
+    // Istilah Inggris umum pada antarmuka.
+    "submit", "cancel", "save", "delete", "edit", "loading", "search here", "no data", "not found", "logout",
+    // Organisasi & pengguna.
+    "front desk", "resepsionis", "manajer", "owner",
+    // Pasien & admisi.
+    "\\bklien\\b", "\\bcustomer\\b", "\\buser\\b", "\\bMRN\\b", "patient id", "\\bencounter\\b",
+    "\\bregistration\\b", "\\bdischarge\\b",
+    // Kamar & bed.
+    "\\bward\\b", "\\bbangsal\\b", "\\brunoang\\b", "\\branjang\\b", "\\bbooking\\b", "\\breservasi\\b",
+    "race condition",
+    // Klinis.
+    "\\bEMR\\b", "\\bronda\\b", "\\bround\\b", "\\bprosedur\\b", "\\bperintah\\b", "prescription",
+    // Farmasi.
+    "dispense", "\\bdrug\\b", "\\bmedicine\\b", "pengeluaran obat",
+    // Keuangan.
+    "\\binvoice\\b", "\\bbill\\b", "\\bnota\\b", "cicilan", "angsuran", "\\bbypass\\b", "force discharge",
+    // Dokumen & antarmuka.
+    "\\bPDF\\b", "unduhan", "activity log",
+    // Data demo.
+    "\\bseed\\b", "\\bfixture\\b", "\\bdummy\\b",
+  ].join("|"),
+  "i",
+);
 
-  for (const r of ["/dashboard", "/kamar", "/farmasi", "/kasir", "/laporan", "/administrasi", "/administrasi/audit"]) {
-    await page.goto(r);
-    await expect(page.getByRole("main")).toBeVisible();
-    const teks = await teksTerlihat(page);
-    // Tanpa ini, pengambil teks yang rusak membuat seluruh pemeriksaan lulus
-    // secara hampa: string kosong tidak pernah cocok dengan pola terlarang.
-    expect(teks.length, `teks ${r} tidak terbaca, pemeriksaan istilah tidak sah`).toBeGreaterThan(200);
-    const cocok = teks.match(terlarang);
-    expect(cocok?.[0] ?? null, `istilah asing/terlarang pada ${r}`).toBeNull();
+test("teks antarmuka berbahasa Indonesia tanpa istilah terlarang glossary", async ({ page }) => {
+  await masukSebagai(page, "Sari Dewanti");
+
+  for (const { rute } of RUTE_PER_PERAN.filter((p) => p.nama === "Sari Dewanti")) {
+    for (const r of rute) {
+      await page.goto(r);
+      await expect(page.getByRole("main")).toBeVisible();
+      const teks = await teksTerlihat(page);
+      // Tanpa ini, pengambil teks yang rusak membuat pemeriksaan lulus hampa:
+      // string kosong tidak pernah cocok dengan pola terlarang.
+      expect(teks.length, `teks ${r} tidak terbaca, pemeriksaan istilah tidak sah`).toBeGreaterThan(200);
+      expect(teks.match(TERLARANG)?.[0] ?? null, `istilah asing/terlarang pada ${r}`).toBeNull();
+    }
   }
 
   await page.goto("/login");
   const login = await teksTerlihat(page);
   expect(login.length, "teks /login tidak terbaca").toBeGreaterThan(200);
-  expect(login.match(terlarang)?.[0] ?? null, "istilah asing/terlarang pada /login").toBeNull();
+  expect(login.match(TERLARANG)?.[0] ?? null, "istilah asing/terlarang pada /login").toBeNull();
 });

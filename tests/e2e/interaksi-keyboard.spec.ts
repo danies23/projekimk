@@ -1,23 +1,20 @@
 import { expect, test, type Page } from "@playwright/test";
+import { KUNCI_SNAPSHOT } from "../../lib/domain/penyimpanan";
 import { masukSebagai } from "./bantuan";
 
 /**
  * Kriteria interaksi pada ticket: alur pendaftaran dan pembayaran selesai
  * sepenuhnya dengan keyboard, dialog memindahkan fokus ke dalam lalu
- * mengembalikannya ke pemicu, dan aksi tidak bisa terkirim dua kali.
+ * mengembalikannya ke pemicu, dan klik ganda tidak tercatat dua kali.
  *
- * Semua test memakai `keyboard` saja — tidak ada `click`, `fill`, atau
- * `selectOption` — karena yang dinilai adalah apakah alurnya bisa diselesaikan
- * tanpa mouse.
+ * Alur di bawah hanya memakai `keyboard` dan `focus()` — tanpa `click`,
+ * `fill`, atau `selectOption` — karena yang dinilai adalah apakah alurnya bisa
+ * diselesaikan tanpa mouse. Test klik ganda di bagian akhir sengaja memakai
+ * klik: yang diuji justru perilaku saat tombol ditekan dua kali.
  */
 
-/** Tulis ke kolom yang sedang fokus. */
-async function ketik(page: Page, teks: string) {
-  await page.keyboard.type(teks);
-}
-
-/** Tab sampai elemen yang dituju menerima fokus, lalu kembalikan nama fokusnya. */
-async function tabKe(page: Page, label: string | RegExp, batas = 40): Promise<boolean> {
+/** Tab sampai elemen yang cocok menerima fokus; gagal bila tidak ketemu. */
+async function tabKe(page: Page, label: RegExp, batas = 40) {
   for (let i = 0; i < batas; i++) {
     await page.keyboard.press("Tab");
     const cocok = await page.evaluate((pola) => {
@@ -29,36 +26,45 @@ async function tabKe(page: Page, label: string | RegExp, batas = 40): Promise<bo
         aktif.id ? (document.querySelector(`label[for="${aktif.id}"]`)?.textContent ?? "") : "",
       ].join(" ");
       return new RegExp(pola, "i").test(teks);
-    }, label instanceof RegExp ? label.source : label);
-    if (cocok) return true;
+    }, label.source);
+    if (cocok) return;
   }
-  return false;
+  throw new Error(`tidak ada elemen berfokus yang cocok ${label} setelah ${batas} Tab`);
 }
+
+test("urutan Tab menyusuri menu sidebar sebelum masuk ke isi halaman", async ({ page }) => {
+  await masukSebagai(page, "Rina Kartika");
+  await page.goto("/pendaftaran");
+
+  // Fokus mulai di awal dokumen; Tab harus melewati setiap tautan menu yang
+  // memang terlihat, dalam urutan yang sama dengan tampilannya.
+  await page.evaluate(() => document.body.focus());
+  for (const nama of ["Dashboard", "Pendaftaran", "Kamar & Bed"]) {
+    await tabKe(page, new RegExp(nama));
+  }
+});
 
 test("alur pendaftaran selesai sepenuhnya dengan keyboard", async ({ page }) => {
   await masukSebagai(page, "Rina Kartika");
   await page.goto("/pendaftaran");
   await expect(page.getByRole("heading", { level: 1, name: "Pendaftaran pasien" })).toBeVisible();
 
-  // Langkah 1: buat pasien baru. Fokus dimulai dari menu sidebar.
-  await page.getByLabel("Nama pasien").focus();
-  await ketik(page, "Pasien Keyboard");
-  await page.getByLabel("NIK", { exact: true }).focus();
-  await ketik(page, "3201010101010099");
+  // Langkah 1: buat pasien baru. Setiap kolom difokuskan lalu diketik, tanpa klik.
+  const isi = async (label: string, teks: string) => {
+    await page.getByLabel(label).focus();
+    await page.keyboard.type(teks);
+  };
+  await isi("Nama pasien", "Pasien Keyboard");
+  await isi("NIK", "3201010101010099");
   await page.getByLabel("Tanggal lahir").focus();
-  await ketik(page, "1990-01-15");
+  await page.keyboard.type("1990-01-15");
   await page.getByLabel("Jenis kelamin").focus();
   await page.keyboard.press("ArrowDown");
-  await page.getByLabel("Alamat").focus();
-  await ketik(page, "Jl. Keyboard 1, Bandung");
-  await page.getByLabel("Telepon pasien").focus();
-  await ketik(page, "081200009999");
-  await page.getByLabel("Nama penanggung jawab").focus();
-  await ketik(page, "Penanggung Jawab");
-  await page.getByLabel("Hubungan dengan pasien").focus();
-  await ketik(page, "Saudara");
-  await page.getByLabel("Telepon penanggung jawab").focus();
-  await ketik(page, "081300009999");
+  await isi("Alamat", "Jl. Keyboard 1, Bandung");
+  await isi("Telepon pasien", "081200009999");
+  await isi("Nama penanggung jawab", "Penanggung Jawab");
+  await isi("Hubungan dengan pasien", "Saudara");
+  await isi("Telepon penanggung jawab", "081300009999");
 
   await page.getByRole("button", { name: "Simpan pasien" }).focus();
   await page.keyboard.press("Enter");
@@ -89,14 +95,14 @@ test("alur pembayaran selesai sepenuhnya dengan keyboard", async ({ page }) => {
   await masukSebagai(page, "Joko Susilo");
   await page.goto("/kasir");
 
-  // Pilih tagihan pertama dari daftar dengan Tab + Enter.
+  // Pilih tagihan pertama dari daftar dengan fokus + Enter.
   await page.getByRole("region", { name: "Daftar tagihan" }).getByRole("button").first().focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { level: 2, name: /^Tagihan / })).toBeVisible();
 
-  // Isi jumlah dengan angka, pilih metode dengan panah, lalu Enter submit.
+  // Isi jumlah dengan angka, pilih metode dengan Space, lalu Enter submit.
   await page.getByLabel("Jumlah dibayar (Rp)").focus();
-  await ketik(page, "100000");
+  await page.keyboard.type("100000");
   await page.getByRole("radio", { name: "Transfer" }).focus();
   await page.keyboard.press("Space");
   await expect(page.getByRole("radio", { name: "Transfer" })).toBeChecked();
@@ -143,6 +149,12 @@ test("dialog pindah bed memindahkan fokus ke dalam lalu mengembalikannya ke pemi
   await expect(pemicu).toBeFocused();
 });
 
+const jumlahAdmisi = (page: Page) =>
+  page.evaluate((kunci) => {
+    const snapshot = JSON.parse(localStorage.getItem(kunci) ?? "{}") as { state?: { admisi?: unknown[] } };
+    return snapshot.state?.admisi?.length ?? 0;
+  }, KUNCI_SNAPSHOT);
+
 test("klik ganda pada tombol simpan admisi tidak membuat admisi ganda", async ({ page }) => {
   await masukSebagai(page, "Rina Kartika");
   await page.goto("/pendaftaran");
@@ -155,14 +167,7 @@ test("klik ganda pada tombol simpan admisi tidak membuat admisi ganda", async ({
   await page.locator('input[name="bed"]:not([disabled])').first().check();
   await page.getByRole("button", { name: "Lanjut ke langkah 3" }).click();
 
-  const jumlahAdmisi = () =>
-    page.evaluate(() => {
-      const snapshot = JSON.parse(localStorage.getItem("dmc.admisi.snapshot.v1") ?? "{}") as {
-        state?: { admisi?: unknown[] };
-      };
-      return snapshot.state?.admisi?.length ?? 0;
-    });
-  const jumlahSebelum = await jumlahAdmisi();
+  const jumlahSebelum = await jumlahAdmisi(page);
 
   // Dua klik dalam satu tick, sebelum React sempat merender ulang — persis
   // yang terjadi saat pengguna menekan Enter dua kali dengan cepat.
@@ -174,6 +179,6 @@ test("klik ganda pada tombol simpan admisi tidak membuat admisi ganda", async ({
   });
   await expect(page.getByRole("heading", { level: 1, name: /Bukti pendaftaran/ })).toBeVisible();
 
-  const jumlahSesudah = await jumlahAdmisi();
+  const jumlahSesudah = await jumlahAdmisi(page);
   expect(jumlahSesudah - jumlahSebelum, "klik ganda membuat lebih dari satu admisi").toBe(1);
 });

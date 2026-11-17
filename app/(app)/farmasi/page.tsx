@@ -157,7 +157,7 @@ function DaftarAntrean({
             </h3>
             {k.baris.length === 0 ? (
               <p className="mt-2 rounded-md border border-border bg-surface-muted p-3 text-caption text-text-muted">
-                Tidak ada resep pada kelompok ini.
+                Tidak ada resep pada kelompok ini. Resep muncul setelah dokter membuatnya pada modul Klinis.
               </p>
             ) : (
               <ul role="list" className="mt-2 space-y-2">

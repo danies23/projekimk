@@ -22,8 +22,7 @@ export default function HalamanTidakDitemukan() {
           className="mt-6 inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-small font-semibold text-on-primary transition-colors hover:bg-primary-hover"
         >
           Kembali ke Dashboard
-        </Link>
-      </section>
+        </Link>      </section>
     </main>
   );
 }

@@ -88,7 +88,10 @@ export default function HalamanDashboard() {
             <h2 className="text-title">Pasien terbaru</h2>
             <p className="mt-1 text-small text-text-muted">
               Lima admisi terakhir beserta bed dan dokter penanggung jawabnya.{" "}
-              <Link href="/laporan" className="font-semibold text-primary hover:underline">
+              <Link
+                href="/laporan"
+                className="inline-flex min-h-11 items-center font-semibold text-primary hover:underline"
+              >
                 Buka laporan per periode
               </Link>
             </p>

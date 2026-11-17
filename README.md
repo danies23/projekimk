@@ -53,14 +53,17 @@ Prototipe mengikuti WCAG 2.1 AA dan diperiksa otomatis, bukan hanya oleh token:
 | Berkas | Yang dijaga |
 |---|---|
 | `lib/design-tokens.test.ts` | kontras setiap pasangan warna yang dideklarasikan |
-| `tests/e2e/aksesibilitas.spec.ts` | audit axe pada 23 rute per peran |
-| `tests/e2e/aksesibilitas-interaktif.spec.ts` | audit axe pada dialog dan formulir yang sedang terbuka |
+| `tests/e2e/aksesibilitas.spec.ts` | audit axe pada setiap rute yang dapat dibuka tiap peran |
+| `tests/e2e/aksesibilitas-interaktif.spec.ts` | audit axe, target 44×44, dan label kolom pada dialog dan formulir yang sedang terbuka |
 | `tests/e2e/ukuran-target-dan-tablet.spec.ts` | target interaktif ≥44×44 px dan tablet 1024×768 tanpa scroll horizontal |
-| `tests/e2e/interaksi-keyboard.spec.ts` | alur pendaftaran dan pembayaran selesai tanpa mouse; fokus dialog |
-| `tests/e2e/kualitas-layar.spec.ts` | tidak ada layar kosong, status terbaca tanpa warna, istilah asing |
+| `tests/e2e/interaksi-keyboard.spec.ts` | alur pendaftaran dan pembayaran selesai tanpa mouse, urutan Tab, fokus dialog, klik ganda |
+| `tests/e2e/kualitas-layar.spec.ts` | tidak ada layar kosong, status terbaca tanpa warna, istilah terlarang glossary |
 | `tests/e2e/kondisi-kosong.spec.ts` | setiap daftar dan laporan punya kondisi kosong yang menjelaskan |
+| `tests/e2e/halaman-tidak-ditemukan.spec.ts` | alamat yang salah pun menjelaskan diri |
 
-Kegagalan audit axe menyebutkan rute, aturan, dan elemen yang bermasalah.
+Rute per peran di test E2E diturunkan dari matriks izin di `lib/domain/izin.ts`,
+bukan daftar kedua. Kegagalan audit axe menyebutkan rute, aturan, dan elemen
+yang bermasalah.
 
 ## Susunan
 

@@ -24,28 +24,34 @@
 ## Comments
 
 - 2026-11-17: Audit dikerjakan dengan mengukur DOM yang benar-benar dirender, bukan dengan
-  membaca token. Enam berkas E2E baru (59 skenario) ditambahkan; `README.md` menjelaskan perannya.
+  membaca token. Tujuh berkas E2E baru (114 skenario) ditambahkan; `README.md` menjelaskan perannya.
+  Rute per peran di test diturunkan dari matriks izin `lib/domain/izin.ts`, bukan daftar kedua.
 
-  **Dua bug nyata ditemukan dan diperbaiki.** Audit target 44×44 memerahkan 12 dari 23 rute:
-  - Tautan logomark di header hanya setinggi **39 px** (`components/shell/shell.tsx`); kini
-    `inline-flex min-h-11`.
-  - Tautan breadcrumb hanya setinggi **21 px** (`components/shell/jejak-navigasi.tsx`); kini
-    `inline-flex min-h-11`.
+  **Tiga bug nyata ditemukan dan diperbaiki.** Audit target 44×44 memerahkan sebagian rute:
+  - Tautan logomark di header hanya setinggi **39 px** (`components/shell/shell.tsx`).
+  - Tautan breadcrumb hanya setinggi **21 px** (`components/shell/jejak-navigasi.tsx`).
+  - Tautan "Buka laporan per periode" di dashboard hanya setinggi **20 px**
+    (`app/(app)/dashboard/page.tsx`) — baru terlihat setelah cakupan rute diperluas ke semua peran.
+  Ketiganya kini `inline-flex min-h-11`.
 
   Sisanya adalah overlay Dev Tools milik `next dev`, bukan UI prototipe. Test menyaringnya lewat
   shadow root (`getRootNode().host`) karena `closest()` tidak melewati batas shadow.
+
+  **Kondisi kosong:** kalimat penjelas diperiksa sebagai kalimat lengkap, bukan pola longgar.
+  Pemeriksaan itu menemukan satu kondisi kosong yang hanya menyebut "tidak ada data" tanpa langkah
+  berikutnya — kelompok resep di Farmasi — dan kalimatnya dilengkapi.
 
   **Yang sudah benar tanpa perubahan** (dibuktikan test, bukan diasumsikan): kontras diukur axe
   pada 1.043 node di halaman audit dan lulus tanpa pelanggaran; alur pendaftaran dan pembayaran
   selesai dengan Tab/Enter/Space saja; kedua dialog memindahkan fokus ke dalam dan mengembalikannya
   ke pemicu; halaman 1024×768 tidak melebar horizontal; seluruh rute berisi dan tidak ada tautan
-  mati; kondisi kosong menjelaskan langkah berikutnya.
+  mati.
 
   **Klik ganda:** dashboard, kasir, klinis, farmasi, kamar, dan administrasi masing-masing diuji
-  dengan `dblclick()` sungguhan dan dua Enter berurutan. Tidak ada yang tercatat dua kali — store
-  adalah penjaga terakhir. Tidak ada indikator loading yang ditambahkan karena `dispatch` bersifat
-  sinkron dan tidak ada panggilan jaringan saat runtime (ADR-0001); indikator untuk aksi nol-detik
-  hanya akan berkedip tanpa memberi informasi.
+  dengan dua klik dalam satu tick, `dblclick()`, dan dua Enter berurutan. Tidak ada yang tercatat
+  dua kali — store adalah penjaga terakhir. Tidak ada indikator loading yang ditambahkan karena
+  `dispatch` bersifat sinkron dan tidak ada panggilan jaringan saat runtime (ADR-0001); indikator
+  untuk aksi nol-detik hanya akan berkedip tanpa memberi informasi.
 
   **Deploy:** URL demo di README ternyata **404 pada `/login` dan `/dashboard`** — deployment
   terakhir 13 November, sebelum ticket 14 dan 15. Repo ditautkan ke proyek `dani-medical-center`

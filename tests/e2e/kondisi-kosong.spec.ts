@@ -1,61 +1,51 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { AKUN_DEMO } from "../../lib/domain/demo-accounts";
+import { KUNCI_SNAPSHOT } from "../../lib/domain/penyimpanan";
+import { buatStateKosong } from "../../lib/domain/state";
 import { masukSebagai } from "./bantuan";
 
 /**
  * Setiap daftar dan laporan harus punya kondisi kosong yang menjelaskan apa
- * yang harus dilakukan (spec, user story 92 dan 106). Kondisi kosong di sini
- * dibuat dengan mengosongkan snapshot sebelum halaman dimuat — bukan dengan
- * menunggu data demo habis.
+ * yang harus dilakukan (spec, user story 92 dan 106). Kondisi kosong dibuat
+ * dengan mengosongkan snapshot sebelum halaman dimuat — bukan dengan menunggu
+ * data demo habis.
+ *
+ * State dirangkai dari `buatStateKosong()` + `AKUN_DEMO`, bukan ditulis ulang
+ * dengan tangan: koleksi baru pada `State` tidak boleh diam-diam lolos dari
+ * test ini.
  */
 
-/** State kosong yang menyisakan akun demo, supaya pengguna tetap bisa masuk. */
-const STATE_HAMPIR_KOSONG = {
+const STATE_KOSONG = {
   versi: 1,
   disimpanPada: "2026-01-01T00:00:00.000Z",
-  state: {
-    pengguna: [
-      { id: "u-pendaftaran", nama: "Rina Kartika", peran: "pendaftaran", aktif: true },
-      { id: "u-dokter", nama: "dr. Ayu Prameswari, Sp.PD", peran: "dokter", aktif: true },
-      { id: "u-perawat", nama: "Ns. Dwi Lestari", peran: "perawat", aktif: true },
-      { id: "u-apoteker", nama: "Nadia Rahmania, S.Farm", peran: "apoteker", aktif: true },
-      { id: "u-kasir", nama: "Joko Susilo", peran: "kasir", aktif: true },
-      { id: "u-pimpinan", nama: "Hendra Wijaya", peran: "pimpinan", aktif: true },
-      { id: "u-admin", nama: "Sari Dewanti", peran: "admin", aktif: true },
-    ],
-    pasien: [],
-    kamar: [],
-    bed: [],
-    admisi: [],
-    catatanKlinis: [],
-    instruksiDijalankan: [],
-    tindakanMaster: [],
-    tindakanAdmisi: [],
-    obat: [],
-    resep: [],
-    tagihan: [],
-    pembayaran: [],
-    mutasiStok: [],
-    audit: [],
-    urutanRM: {},
-  },
+  state: { ...buatStateKosong(), pengguna: AKUN_DEMO.map(({ id, nama, peran }) => ({ id, nama, peran, aktif: true })) },
 };
 
-async function tanamStateKosong(page: import("@playwright/test").Page) {
+async function tanamStateKosong(page: Page) {
   await page.goto("/login");
-  await page.evaluate((snapshot) => {
-    localStorage.setItem("dmc.admisi.snapshot.v1", JSON.stringify(snapshot));
-  }, STATE_HAMPIR_KOSONG);
+  await page.evaluate(
+    ([kunci, snapshot]) => localStorage.setItem(kunci!, JSON.stringify(snapshot)),
+    [KUNCI_SNAPSHOT, STATE_KOSONG] as const,
+  );
 }
 
-/** Kalimat penjelas yang harus muncul, bukan sekadar tabel kosong. */
+/**
+ * Kalimat penjelas yang harus muncul, bukan sekadar tabel kosong. `teks` adalah
+ * kalimat lengkapnya — bukan pola longgar — sehingga test gagal bila penjelasan
+ * menyusut menjadi "tidak ada data" tanpa langkah berikutnya.
+ */
 const HARAPAN: Array<{ peran: string; rute: string; teks: RegExp }> = [
-  { peran: "Rina Kartika", rute: "/kamar", teks: /Belum ada kamar aktif/i },
-  { peran: "Rina Kartika", rute: "/pendaftaran", teks: /Belum ada pasien yang sedang dirawat/i },
-  { peran: "Ns. Dwi Lestari", rute: "/klinis", teks: /Belum ada pasien dirawat/i },
-  { peran: "Nadia Rahmania", rute: "/farmasi", teks: /Tidak ada resep pada kelompok ini/i },
-  { peran: "Joko Susilo", rute: "/kasir", teks: /Belum ada tagihan/i },
-  { peran: "Sari Dewanti", rute: "/administrasi/audit", teks: /Belum ada aktivitas tercatat/i },
-  { peran: "Hendra Wijaya", rute: "/laporan", teks: /Tidak ada data pada periode ini/i },
+  { peran: "Rina Kartika", rute: "/kamar", teks: /Belum ada kamar aktif\. Admin dapat menambahkan kamar/i },
+  { peran: "Rina Kartika", rute: "/pendaftaran", teks: /Belum ada pasien yang sedang dirawat\. Selesaikan pendaftaran/i },
+  { peran: "Ns. Dwi Lestari", rute: "/klinis", teks: /Pasien muncul di sini setelah petugas pendaftaran membuat admisi/i },
+  { peran: "Nadia Rahmania", rute: "/farmasi", teks: /Tidak ada resep pada kelompok ini\. Resep muncul setelah dokter/i },
+  { peran: "Joko Susilo", rute: "/kasir", teks: /Belum ada tagihan\. Tagihan dibuat otomatis saat pasien didaftarkan/i },
+  {
+    peran: "Sari Dewanti",
+    rute: "/administrasi/audit",
+    teks: /Belum ada aktivitas tercatat\. Entri muncul setelah data demo diubah/i,
+  },
+  { peran: "Hendra Wijaya", rute: "/laporan", teks: /Coba lebarkan rentang tanggal atau pilih bulan lain/i },
 ];
 
 for (const { peran, rute, teks } of HARAPAN) {
@@ -66,8 +56,5 @@ for (const { peran, rute, teks } of HARAPAN) {
 
     await expect(page.getByRole("main")).toBeVisible();
     await expect(page.getByRole("main")).toContainText(teks);
-    // Layar kosong tanpa penjelasan akan gagal di sini: kalimat penjelas harus
-    // memberi tahu penyebab dan langkah berikutnya, bukan hanya "tidak ada data".
-    await expect(page.getByRole("main")).toContainText(/(setelah|sebelum|untuk|dapat|pilih|mulai|menunggu|cocok)/i);
   });
 }
