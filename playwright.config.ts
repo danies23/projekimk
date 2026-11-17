@@ -22,7 +22,10 @@ export default defineConfig({
   webServer: {
     command: `npx next dev --port ${PORT}`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    // Selalu server milik Playwright. Dengan `reuseExistingServer`, `next dev`
+    // yang tertinggal di port ini membuat suite berjalan di atas kode lama —
+    // atau gagal beramai-ramai karena satu server diperebutkan semua worker.
+    reuseExistingServer: false,
     timeout: 180_000,
   },
 });

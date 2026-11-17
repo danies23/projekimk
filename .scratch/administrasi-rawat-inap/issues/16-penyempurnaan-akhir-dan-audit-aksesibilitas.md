@@ -24,7 +24,7 @@
 ## Comments
 
 - 2026-11-17: Audit dikerjakan dengan mengukur DOM yang benar-benar dirender, bukan dengan
-  membaca token. Tujuh berkas E2E baru (125 skenario) ditambahkan; `README.md` menjelaskan perannya.
+  membaca token. Tujuh berkas E2E baru (137 skenario) ditambahkan; `README.md` menjelaskan perannya.
   Rute per peran di test diturunkan dari matriks izin `lib/domain/izin.ts`, bukan daftar kedua.
 
   **Tiga bug nyata ditemukan dan diperbaiki.** Audit target 44×44 memerahkan sebagian rute:
@@ -91,6 +91,6 @@
   `masukSebagai` dipakai semua berkas lama.
 
   Verifikasi akhir: `npx tsc --noEmit`, `npx eslint .`, `npx vitest run` (296 test), dan
-  `npx playwright test` (216 skenario) semuanya hijau; `npm run build` menghasilkan 15 rute statis.
+  `npx playwright test` (223 skenario) semuanya hijau; `npm run build` menghasilkan 15 rute statis.
   Zip diuji dengan cara diekstrak ke direktori kosong, `npm ci`, lalu seluruh perintah di README.
 

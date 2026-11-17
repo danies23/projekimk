@@ -30,8 +30,10 @@ Test E2E memakai Chromium. Sekali saja setelah clone:
 npx playwright install chromium
 ```
 
-Playwright menjalankan `next dev` sendiri pada port 3100, jadi tidak perlu
-menyalakan server pengembangan secara terpisah.
+Playwright menjalankan `next dev` sendiri pada port 3100. Jangan menyalakan server
+pengembangan di port itu saat menjalankan `npm run test:e2e`: konfigurasinya
+sengaja tidak memakai server yang sudah ada (`reuseExistingServer: false`),
+sehingga suite tidak pernah diam-diam berjalan di atas kode lama.
 
 ## Menjalankan ulang dari kondisi bersih
 

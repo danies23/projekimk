@@ -130,27 +130,31 @@ const TERLARANG = new RegExp(
   "i",
 );
 
-test("teks antarmuka berbahasa Indonesia tanpa istilah terlarang glossary", async ({ page }) => {
-  // Setiap peran, bukan satu: hanya dokter dan petugas pendaftaran yang melihat
-  // modul Klinis dan Pendaftaran, dua layar dengan teks terbanyak.
-  const sudahDiperiksa = new Set<string>();
-  for (const { nama, rute } of RUTE_PER_PERAN) {
+/** Pemeriksaan istilah untuk satu rute; kosong berarti bersih. */
+async function periksaIstilah(page: Page, rute: string): Promise<string | null> {
+  await page.goto(rute);
+  await expect(page.getByRole("main")).toBeVisible();
+  const teks = await teksTerlihat(page);
+  // Tanpa ini, pengambil teks yang rusak membuat pemeriksaan lulus hampa:
+  // string kosong tidak pernah cocok dengan pola terlarang. Ambangnya rendah
+  // karena dashboard perawat memang hanya ~190 karakter; yang dicegah adalah
+  // halaman benar-benar kosong, bukan halaman ringkas.
+  expect(teks.length, `teks ${rute} tidak terbaca, pemeriksaan istilah tidak sah`).toBeGreaterThan(120);
+  return teks.match(TERLARANG)?.[0] ?? null;
+}
+
+// Satu test per peran, bukan satu test untuk semuanya: versi gabungan menghabiskan
+// anggaran 30 detik saat suite berjalan paralel, dan gagal sebagai timeout —
+// pesan yang menyesatkan untuk pemeriksaan kosakata.
+for (const { nama, rute } of RUTE_PER_PERAN) {
+  test(`${nama}: istilah antarmuka sesuai glossary`, async ({ page }) => {
     await masukSebagai(page, nama);
     for (const r of rute) {
-      if (sudahDiperiksa.has(r)) continue;
-      sudahDiperiksa.add(r);
-      await page.goto(r);
-      await expect(page.getByRole("main")).toBeVisible();
-      const teks = await teksTerlihat(page);
-      // Tanpa ini, pengambil teks yang rusak membuat pemeriksaan lulus hampa:
-      // string kosong tidak pernah cocok dengan pola terlarang.
-      expect(teks.length, `teks ${r} tidak terbaca, pemeriksaan istilah tidak sah`).toBeGreaterThan(200);
-      expect(teks.match(TERLARANG)?.[0] ?? null, `istilah asing/terlarang pada ${r}`).toBeNull();
+      expect(await periksaIstilah(page, r), `istilah asing/terlarang pada ${r}`).toBeNull();
     }
-  }
+  });
+}
 
-  await page.goto("/login");
-  const login = await teksTerlihat(page);
-  expect(login.length, "teks /login tidak terbaca").toBeGreaterThan(200);
-  expect(login.match(TERLARANG)?.[0] ?? null, "istilah asing/terlarang pada /login").toBeNull();
+test("halaman login memakai istilah yang sama", async ({ page }) => {
+  expect(await periksaIstilah(page, "/login"), "istilah asing/terlarang pada /login").toBeNull();
 });
