@@ -97,11 +97,15 @@ test("teks antarmuka berbahasa Indonesia tanpa istilah Inggris yang terlarang", 
     await page.goto(r);
     await expect(page.getByRole("main")).toBeVisible();
     const teks = await teksTerlihat(page);
+    // Tanpa ini, pengambil teks yang rusak membuat seluruh pemeriksaan lulus
+    // secara hampa: string kosong tidak pernah cocok dengan pola terlarang.
+    expect(teks.length, `teks ${r} tidak terbaca, pemeriksaan istilah tidak sah`).toBeGreaterThan(200);
     const cocok = teks.match(terlarang);
     expect(cocok?.[0] ?? null, `istilah asing/terlarang pada ${r}`).toBeNull();
   }
 
   await page.goto("/login");
   const login = await teksTerlihat(page);
+  expect(login.length, "teks /login tidak terbaca").toBeGreaterThan(200);
   expect(login.match(terlarang)?.[0] ?? null, "istilah asing/terlarang pada /login").toBeNull();
 });
